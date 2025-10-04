@@ -1,5 +1,12 @@
+/* 폰트 기본 설정 */
 body {
-  font-family: 'Pretendard Variable', 'Inter', sans-serif;
+  font-family: 'Pretendard Variable', sans-serif;
+}
+
+/* 숫자와 영문은 Inter 폰트 우선 적용 */
+.num, .eng, input, button {
+  font-family: 'Inter', 'Pretendard Variable', sans-serif;
+  letter-spacing: 0.2px;
 }
 
 :root {
