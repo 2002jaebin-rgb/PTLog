@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
-import { supabase } from '../supabaseClient'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../supabaseClient'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -14,7 +16,7 @@ export default function Login() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return setError(error.message)
 
-    // 로그인한 유저가 트레이너인지 확인
+    // 로그인 후 트레이너 페이지로 리다이렉트
     const { data: trainer } = await supabase
       .from('trainers')
       .select('id')
@@ -26,26 +28,32 @@ export default function Login() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <h1 className="text-2xl font-bold mb-4">PTLog 로그인</h1>
-      <form onSubmit={handleLogin} className="bg-white p-6 rounded shadow-md w-80">
-        <input
-          type="email"
-          placeholder="이메일"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="border p-2 w-full mb-2"
-        />
-        <input
-          type="password"
-          placeholder="비밀번호"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="border p-2 w-full mb-2"
-        />
-        {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
-        <button className="bg-blue-500 text-white w-full p-2 rounded">로그인</button>
-      </form>
+    <div className="flex items-center justify-center min-h-screen bg-[var(--bg-dark)]">
+      <div className="bg-[var(--card-dark)] p-6 rounded-lg shadow-md w-full sm:max-w-md">
+        <h2 className="text-2xl font-semibold text-white mb-6">PTLog 로그인</h2>
+        {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+        <form onSubmit={handleLogin}>
+          <Input
+            type="email"
+            label="이메일"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            className="mb-4"
+          />
+          <Input
+            type="password"
+            label="비밀번호"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            className="mb-6"
+          />
+          <Button type="submit" className="w-full py-3 text-lg font-semibold">
+            로그인
+          </Button>
+        </form>
+      </div>
     </div>
   )
 }
