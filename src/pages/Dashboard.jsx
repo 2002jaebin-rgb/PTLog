@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 export default function Dashboard() {
   const [members, setMembers] = useState([])
   const [showForm, setShowForm] = useState(false)
-  const [newMember, setNewMember] = useState({ name: '', email: '', sessions_total: 0 })
+  const [newMember, setNewMember] = useState({ name: '', email: '', sessions_total: 0, password: '' })
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -35,17 +35,18 @@ export default function Dashboard() {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({
-          trainer_id: user.id,
-          name: newMember.name,
-          email: newMember.email,
-          sessions_total: parseInt(newMember.sessions_total, 10)
-        }),
+            trainer_id: user.id,
+            name: newMember.name,
+            email: newMember.email,
+            sessions_total: parseInt(newMember.sessions_total, 10),
+            password: newMember.password
+          }),          
       })
   
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Unknown error')
   
-      alert(`회원 "${newMember.name}" 등록 완료!\n임시 비밀번호: ${data.password}`)
+      alert(`회원 "${newMember.name}" 등록 완료!\n 비밀번호: ${data.password}`)
       setShowForm(false)
       setNewMember({ name: '', email: '', sessions_total: 0 })
       fetchMembers()
@@ -54,8 +55,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }
-  
+  }  
 
   return (
     <div className="p-6">
@@ -89,6 +89,14 @@ export default function Dashboard() {
             placeholder="이메일"
             value={newMember.email}
             onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+            className="border p-2 w-full mb-2"
+          />
+          <input
+            required
+            type="password"
+            placeholder="비밀번호 (회원 로그인용)"
+            value={newMember.password}
+            onChange={(e) => setNewMember({ ...newMember, password: e.target.value })}
             className="border p-2 w-full mb-2"
           />
           <input
