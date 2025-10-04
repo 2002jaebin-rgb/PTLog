@@ -13,6 +13,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/member/:id" element={<MemberDetail />} />
         <Route path="/client" element={<ClientPage />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
   )
