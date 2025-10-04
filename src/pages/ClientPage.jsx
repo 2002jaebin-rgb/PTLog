@@ -7,21 +7,40 @@ export default function ClientPage() {
   useEffect(() => {
     const fetchRequests = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data } = await supabase
+
+      // 먼저 회원의 member_id를 가져오기
+      const { data: member, error: memberError } = await supabase
+        .from('members')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single()
+
+      if (memberError || !member) {
+        console.error('회원 정보 없음:', memberError)
+        setRequests([])
+        return
+      }
+
+      // 이제 session_requests 조회
+      const { data: reqs, error } = await supabase
         .from('session_requests')
         .select('*')
-        .in('member_id', supabase
-          .from('members')
-          .select('id')
-          .eq('auth_user_id', user.id)
-        )
-      setRequests(data || [])
+        .eq('member_id', member.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      if (error) console.error(error)
+      setRequests(reqs || [])
     }
+
     fetchRequests()
   }, [])
 
   const handleAccept = async (id) => {
-    await supabase.from('session_requests').update({ status: 'accepted' }).eq('id', id)
+    await supabase
+      .from('session_requests')
+      .update({ status: 'accepted' })
+      .eq('id', id)
     setRequests(requests.filter((r) => r.id !== id))
   }
 
@@ -35,10 +54,15 @@ export default function ClientPage() {
           <p className="font-semibold mb-2">{req.notes}</p>
           <ul className="mb-2">
             {req.exercises?.map((ex, i) => (
-              <li key={i}>• {ex.name} {ex.sets}세트 × {ex.reps}회 ({ex.weight}kg)</li>
+              <li key={i}>
+                • {ex.name} {ex.sets}세트 × {ex.reps}회 ({ex.weight}kg)
+              </li>
             ))}
           </ul>
-          <button onClick={() => handleAccept(req.id)} className="bg-green-500 text-white px-4 py-2 rounded">
+          <button
+            onClick={() => handleAccept(req.id)}
+            className="bg-green-500 text-white px-4 py-2 rounded"
+          >
             승인 및 회차 차감
           </button>
         </div>
