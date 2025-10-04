@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import MemberDetail from './pages/MemberDetail'
 import ClientPage from './pages/ClientPage'
+import Settings from './pages/Settings'
+
 
 export default function App() {
   return (
