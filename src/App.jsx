@@ -4,6 +4,7 @@ import Header from './components/ui/Header'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import MemberDetail from './pages/MemberDetail'
+import ReservationsPage from './pages/ReservationsPage';  // 예약 관리 페이지
 import ClientPage from './pages/ClientPage'
 import Settings from './pages/Settings'
 import { supabase } from './supabaseClient' // supabase client import
