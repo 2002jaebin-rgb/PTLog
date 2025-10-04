@@ -1,0 +1,15 @@
+:root {
+    --bg-dark: #121212;
+    --card-dark: #1a1a1a;
+    --text-primary: #ededed;
+    --text-secondary: #9ca3af;
+    --accent-blue: #2563eb;
+    --accent-green: #22c55e;
+    --border-color: #2a2a2a;
+  }
+  
+  body {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+  }
+  
