@@ -1,7 +1,11 @@
-// /src/main.jsx
 import React from 'react'
-import { createRoot } from 'react-dom/client'
+import ReactDOM from 'react-dom/client'
 import App from './App'
+import './index.css' // ✅ Tailwind 연결
+import './styles/theme.css' // ✅ 기존 다크테마 색상 유지
 
-const rootEl = document.getElementById('root')
-createRoot(rootEl).render(<App />)
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)

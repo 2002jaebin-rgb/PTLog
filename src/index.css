@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* PTLog 전역 색상 불러오기 */
+@import './styles/theme.css';
