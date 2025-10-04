@@ -26,37 +26,36 @@ export default function Dashboard() {
     e.preventDefault()
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-
+  
     try {
-      // (A) Supabase Auth - 새 회원 유저 생성
-      const password = Math.random().toString(36).slice(-8) // 임시 비번
-      const { data: createdUser, error: authError } = await supabase.auth.admin.createUser({
-        email: newMember.email,
-        password,
-        email_confirm: true
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-member`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          trainer_id: user.id,
+          name: newMember.name,
+          email: newMember.email,
+          sessions_total: parseInt(newMember.sessions_total, 10)
+        }),
       })
-      if (authError) throw authError
-
-      // (B) members 테이블에 등록
-      const { error: insertError } = await supabase.from('members').insert([{
-        trainer_id: user.id,
-        name: newMember.name,
-        email: newMember.email,
-        sessions_total: parseInt(newMember.sessions_total, 10),
-        auth_user_id: createdUser.user.id
-      }])
-      if (insertError) throw insertError
-
-      alert(`회원 "${newMember.name}" 추가 완료!\n임시 비밀번호: ${password}`)
+  
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Unknown error')
+  
+      alert(`회원 "${newMember.name}" 등록 완료!\n임시 비밀번호: ${data.password}`)
       setShowForm(false)
       setNewMember({ name: '', email: '', sessions_total: 0 })
       fetchMembers()
     } catch (err) {
-      alert('회원 추가 중 오류 발생: ' + err.message)
+      alert('회원 추가 실패: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
+  
 
   return (
     <div className="p-6">
