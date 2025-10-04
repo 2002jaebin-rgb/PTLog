@@ -1,0 +1,21 @@
+{
+    "name": "ptlog",
+    "version": "0.9.0",
+    "private": true,
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview"
+    },
+    "dependencies": {
+      "@supabase/supabase-js": "^2.44.2",
+      "react": "^18.3.1",
+      "react-dom": "^18.3.1",
+      "react-router-dom": "^6.22.3"
+    },
+    "devDependencies": {
+      "@vitejs/plugin-react": "^4.3.0",
+      "vite": "^5.2.0"
+    }
+  }
+  
