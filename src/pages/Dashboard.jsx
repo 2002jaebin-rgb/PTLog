@@ -46,7 +46,7 @@ export default function Dashboard() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Unknown error')
   
-      alert(`회원 "${newMember.name}" 등록 완료!\n 비밀번호: ${data.password}`)
+      alert(`회원 "${newMember.name}" 등록 완료!\n 이메일: ${data.email}\n 비밀번호: ${data.password}`)
       setShowForm(false)
       setNewMember({ name: '', email: '', sessions_total: 0 })
       fetchMembers()
