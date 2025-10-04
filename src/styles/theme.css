@@ -10,17 +10,21 @@ body {
 }
 
 :root {
-    --bg-dark: #121212;
-    --card-dark: #1a1a1a;
-    --text-primary: #ededed;
-    --text-secondary: #9ca3af;
-    --accent-blue: #2563eb;
-    --accent-green: #22c55e;
-    --border-color: #2a2a2a;
-  }
-  
-  body {
-    background-color: var(--bg-dark);
-    color: var(--text-primary);
-  }
+  /* 전체 톤 - 살짝 블루그레이 계열 다크모드 */
+  --bg-dark: #101214;
+  --card-dark: #1C2430;       /* 메인 카드 - 블루그레이 */
+  --text-primary: #EDEDED;
+  --text-secondary: #9CA3AF;
+  --border-color: #2D3748;    /* 카드 경계선 - 약한 대비 */
+  --accent-blue: #3B82F6;     /* PTLog 포인트 블루 */
+  --accent-green: #2DD4BF;    /* 확정/성공용 민트 */
+}
+
+/* 폰트 */
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: 'Pretendard Variable', 'Inter', sans-serif;
+}
+
   
