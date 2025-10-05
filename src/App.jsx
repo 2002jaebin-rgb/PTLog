@@ -60,6 +60,14 @@ export default function App() {
               }
             />
             <Route
+              path="/reservations"
+              element={
+                <ProtectedRoute>
+                  <ReservationsPage />  {/* 예약 관리 페이지 */}
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/client"
               element={
                 <ProtectedRoute>
