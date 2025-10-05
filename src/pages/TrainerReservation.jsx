@@ -201,7 +201,7 @@ export default function TrainerReservation() {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold text-white mb-4">예약 관리</h1>
+      <h1 className="text-2xl font-bold text-white mb-4">트레이너 예약 관리</h1>
 
       {sessions.length === 0 ? (
         <Card className="p-4">아직 등록된 세션이 없습니다.</Card>
