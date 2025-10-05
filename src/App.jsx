@@ -4,9 +4,10 @@ import Header from './components/ui/Header'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import MemberDetail from './pages/MemberDetail'
-import ReservationsPage from './pages/ReservationsPage';  // 예약 관리 페이지
 import ClientPage from './pages/ClientPage'
 import Settings from './pages/Settings'
+import TrainerReservation from './pages/TrainerReservation'
+import ClientReservation from './pages/ClientReservation'
 import { supabase } from './supabaseClient' // supabase client import
 import './styles/theme.css'
 
@@ -60,10 +61,18 @@ export default function App() {
               }
             />
             <Route
-              path="/reservations"
+              path="/trainer-reservation"
               element={
                 <ProtectedRoute>
-                  <ReservationsPage />  {/* 예약 관리 페이지 */}
+                  <TrainerReservation />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/client-reservation"
+              element={
+                <ProtectedRoute>
+                  <ClientReservation />
                 </ProtectedRoute>
               }
             />

@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 
-export default function ReservationsPage() {
+export default function TrainerReservation() {
   const [loading, setLoading] = useState(true)
   const [trainerId, setTrainerId] = useState(null)
   const [sessions, setSessions] = useState([])        // 트레이너 소유 세션
