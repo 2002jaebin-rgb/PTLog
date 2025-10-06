@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react'
 
-// 시간 → 분
+// 시간 문자열을 분으로 변환
 const timeToMinutes = (t) => {
   if (!t) return 0
   const [h, m] = t.slice(0, 5).split(':').map(Number)
   return h * 60 + m
 }
 
-// 분 → HH:MM
+// 분을 "HH:MM" 문자열로 변환
 const toTimeString = (m) => {
   const h = Math.floor(m / 60)
   const min = m % 60
@@ -25,19 +25,11 @@ export default function ScheduleGrid({
   endHour = 23,
   showStatusColors = { available: true, pending: true, booked: true },
 }) {
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState(null)
-  const [hoverCell, setHoverCell] = useState(null)
-  const [isTouchDevice, setIsTouchDevice] = useState(false)
-  const [touchStart, setTouchStart] = useState(null)
+  const [firstClick, setFirstClick] = useState(null) // 첫 클릭(시작점)
+  const [secondClick, setSecondClick] = useState(null) // 두 번째 클릭(끝점)
   const pendingSet = new Set(reservations.map((r) => r.session_id))
 
-  // === 장치 감지 ===
-  useEffect(() => {
-    setIsTouchDevice('ontouchstart' in window)
-  }, [])
-
-  // === 범위 자동 선택 ===
+  // ✅ 범위 자동 선택 함수
   const selectRange = (day, startTime, endTime) => {
     const startMin = timeToMinutes(startTime)
     const endMin = timeToMinutes(endTime)
@@ -47,49 +39,30 @@ export default function ScheduleGrid({
     }
   }
 
-  // === PC: 드래그 방식 ===
-  const handleMouseDown = (day, time) => {
-    if (!selectable || isTouchDevice) return
-    setIsDragging(true)
-    setDragStart({ day, time })
-  }
+  // ✅ 클릭 처리 로직 (두 번 클릭으로 범위 선택)
+  const handleClick = (day, time) => {
+    if (!selectable) return
 
-  const handleMouseUp = (day, time) => {
-    if (!selectable || isTouchDevice || !dragStart) return
-    selectRange(day, dragStart.time, time)
-    setIsDragging(false)
-    setDragStart(null)
-    setHoverCell(null)
-  }
-
-  // ✅ 마우스 이동 중에도 실시간 추적
-  const handleMouseMove = (e) => {
-    if (!isDragging || !dragStart) return
-    const cell = e.target.closest('td[data-day][data-time]')
-    if (!cell) return
-    const { day, time } = cell.dataset
-    if (hoverCell?.day === day && hoverCell?.time === time) return
-    setHoverCell({ day, time })
-    selectRange(day, dragStart.time, time)
-  }
-
-  // === 모바일: 두 번 탭 방식 ===
-  const handleTouchStart = (day, time) => {
-    if (!selectable || !isTouchDevice) return
-    if (!touchStart) {
-      // 첫 번째 터치
-      setTouchStart({ day, time })
-    } else {
-      // 두 번째 터치 → 자동 범위 선택
-      if (touchStart.day === day) selectRange(day, touchStart.time, time)
-      setTouchStart(null)
+    if (!firstClick) {
+      // 첫 클릭 시 시작점 저장
+      setFirstClick({ day, time })
+      setSecondClick(null)
+    } else if (firstClick && !secondClick) {
+      // 두 번째 클릭 → 같은 날이면 범위 선택 실행
+      if (firstClick.day === day) {
+        selectRange(day, firstClick.time, time)
+      }
+      // 다음 선택을 위해 초기화
+      setFirstClick(null)
+      setSecondClick(null)
     }
   }
 
-  // === 색상 계산 ===
+  // ✅ 셀 색상 계산
   const getCellClass = (dayKey, time) => {
     const dateKey = days.find((d) => d.key === dayKey)?.date
     if (!dateKey) return 'bg-gray-800'
+
     const cellStart = timeToMinutes(time)
     const cellEnd = cellStart + 30
     const session = sessions.find((s) => {
@@ -100,6 +73,7 @@ export default function ScheduleGrid({
     })
 
     const key = `${dayKey}-${time}`
+
     if (selectedSlots[key]) return 'bg-blue-400'
     if (!session) return 'bg-gray-800'
     if (showStatusColors.pending && pendingSet.has(session.session_id))
@@ -115,16 +89,10 @@ export default function ScheduleGrid({
     }
   }
 
-  // === 시간 블록 ===
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
 
   return (
-    <div
-      className="overflow-x-auto select-none"
-      onMouseLeave={() => setIsDragging(false)}
-      onMouseUp={() => setIsDragging(false)}
-      onMouseMove={handleMouseMove}
-    >
+    <div className="overflow-x-auto select-none">
       <table className="min-w-full border border-gray-700 text-sm">
         <thead>
           <tr>
@@ -161,9 +129,7 @@ export default function ScheduleGrid({
                         className={`border border-gray-700 h-6 ${
                           selectable ? 'cursor-pointer' : ''
                         } ${color}`}
-                        onMouseDown={() => handleMouseDown(d.key, hourLabel)}
-                        onMouseUp={() => handleMouseUp(d.key, hourLabel)}
-                        onTouchStart={() => handleTouchStart(d.key, hourLabel)}
+                        onClick={() => handleClick(d.key, hourLabel)}
                       />
                     )
                   })}
@@ -182,9 +148,7 @@ export default function ScheduleGrid({
                         className={`border border-gray-700 h-6 ${
                           selectable ? 'cursor-pointer' : ''
                         } ${color}`}
-                        onMouseDown={() => handleMouseDown(d.key, halfLabel)}
-                        onMouseUp={() => handleMouseUp(d.key, halfLabel)}
-                        onTouchStart={() => handleTouchStart(d.key, halfLabel)}
+                        onClick={() => handleClick(d.key, halfLabel)}
                       />
                     )
                   })}
