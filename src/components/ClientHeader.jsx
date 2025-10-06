@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../supabaseClient'
 
 export default function ClientHeader({ member }) {
+    console.log('[DEBUG] ClientHeader rendered with props:', member)
   const navigate = useNavigate()
   const t = (label, extra = {}) =>
     console.log(`[PTLOG][${performance.now().toFixed(1)}ms] ${label}`, extra)
