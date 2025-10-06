@@ -56,7 +56,7 @@ export default function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-[var(--bg-dark)] text-[var(--text-primary)]">
         {/* ✅ Header는 BrowserRouter 내부로 이동하고 user를 props로 받음 */}
-        <Header user={user} />
+        <Header key={user ? user.id : 'no-user'} user={user} />
 
         <main className="p-4 max-w-3xl mx-auto">
           <Routes>
