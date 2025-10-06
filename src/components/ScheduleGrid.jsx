@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 
 // 시간 문자열 → 분
 const timeToMinutes = (t) => {
@@ -60,8 +60,8 @@ export default function ScheduleGrid({
   // ✅ 셀 색상 계산 + 시각 피드백
   const getCellClass = (dayKey, time) => {
     const dateKey = days.find((d) => d.key === dayKey)?.date
-    if (!dateKey) return 'bg-gray-800'
-  
+    if (!dateKey) return 'bg-[rgba(255,255,255,0.04)]'
+
     const cellStart = timeToMinutes(time)
     const cellEnd = cellStart + 30
     const session = sessions.find((s) => {
@@ -70,41 +70,41 @@ export default function ScheduleGrid({
       const sEnd = timeToMinutes(s.end_time)
       return sStart < cellEnd && sEnd > cellStart
     })
-  
+
     const key = `${dayKey}-${time}`
-    let baseColor = 'bg-gray-800'
-  
+    let baseColor = 'bg-[rgba(255,255,255,0.04)]' // 비활성 영역 기본색 (약한 대비)
+
     if (selectedSlots[key]) baseColor = 'bg-blue-400'
     else if (session) {
       if (showStatusColors.pending && pendingSet.has(session.session_id))
-        baseColor = 'bg-yellow-400'
+        baseColor = 'bg-yellow-400 animate-pulse'
       else if (session.status === 'booked' && showStatusColors.booked)
         baseColor = 'bg-green-500'
       else if (session.status === 'available' && showStatusColors.available)
-        baseColor = 'bg-blue-500'
+        baseColor = 'bg-blue-500 hover:bg-blue-400'
     }
-  
-    // ✅ 시작점 / 끝점 강조
+
+    // ✅ 시작점 / 끝점 강조 (격자 유지 + 두꺼운 테두리)
     if (firstClick && firstClick.day === dayKey && firstClick.time === time) {
-      return `${baseColor} border-4 border-blue-400 ring-2 ring-blue-400`
+      return `${baseColor} border-2 border-blue-400 z-10`
     }
     if (secondClick && secondClick.day === dayKey && secondClick.time === time) {
-      return `${baseColor} border-4 border-green-400 ring-2 ring-green-400`
+      return `${baseColor} border-2 border-green-400 z-10`
     }
-  
-    return `${baseColor} border-transparent`
-  }  
+
+    return `${baseColor}`
+  }
 
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
 
   return (
     <div className="overflow-x-auto select-none">
-      <table className="min-w-full border border-gray-700 text-sm">
+      <table className="min-w-full border border-gray-800 text-sm">
         <thead>
           <tr>
-            <th className="border border-gray-700 p-1 bg-gray-800 w-16">시간</th>
+            <th className="border border-gray-800 p-1 bg-gray-800 w-16">시간</th>
             {days.map((d) => (
-              <th key={d.key} className="border border-gray-700 p-1 bg-gray-800">
+              <th key={d.key} className="border border-gray-800 p-1 bg-gray-800">
                 {d.label}
               </th>
             ))}
@@ -119,7 +119,7 @@ export default function ScheduleGrid({
                 {/* 상단 30분 */}
                 <tr>
                   <td
-                    className="border border-gray-700 text-center bg-gray-900 w-16"
+                    className="border border-gray-800 text-center bg-gray-900 w-16"
                     rowSpan={2}
                   >
                     {hourLabel}
@@ -132,9 +132,9 @@ export default function ScheduleGrid({
                         key={key}
                         data-day={d.key}
                         data-time={hourLabel}
-                        className={`border border-gray-700 h-6 transition-all duration-100 ${
+                        className={`border border-gray-800 h-6 relative transition-all duration-150 ${
                           selectable ? 'cursor-pointer' : ''
-                        } ${color}`}
+                        } ${color} hover:brightness-110`}
                         onClick={() => handleClick(d.key, hourLabel)}
                       />
                     )
@@ -151,9 +151,9 @@ export default function ScheduleGrid({
                         key={key}
                         data-day={d.key}
                         data-time={halfLabel}
-                        className={`border border-gray-700 h-6 transition-all duration-100 ${
+                        className={`border border-gray-800 h-6 relative transition-all duration-150 ${
                           selectable ? 'cursor-pointer' : ''
-                        } ${color}`}
+                        } ${color} hover:brightness-110`}
                         onClick={() => handleClick(d.key, halfLabel)}
                       />
                     )
