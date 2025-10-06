@@ -53,7 +53,7 @@ export default function TrainerSchedule() {
 
     const { data: sessions, error:sErr } = await supabase
       .from('sessions')
-      .select('date, start_time, end_time, status')
+      .select('session_id, date, start_time, end_time, status')
       .eq('trainer_id', id)
       .gte('date', startDate)
       .lte('date', endStr)
@@ -64,10 +64,13 @@ export default function TrainerSchedule() {
     }
 
       // 해당 트레이너의 pending 예약들
+
+    const sessionIds = (sessions || []).map(s => s.session_id)
     const { data: reservations, error: rErr } = await supabase
-      .from('reservations')
-      .select('session_id, status')
-      .eq('status', 'pending')
+        .from('reservations')
+        .select('session_id, status')
+        .in('session_id', sessionIds)
+        .eq('status', 'pending')
 
     if (rErr) {
     console.error('예약 불러오기 실패:', rErr)
@@ -75,7 +78,7 @@ export default function TrainerSchedule() {
 
     setExistingSessions(sessions || [])
     setPendingReservations(reservations || [])
-    
+
     console.log('--- sessions ---')
     console.table(sessions)
     console.log('--- reservations ---')
