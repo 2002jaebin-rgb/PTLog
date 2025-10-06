@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import ScheduleGrid from '../components/ScheduleGrid'
+import AddSessionModal from '../components/AddSessionModal'
 
 export default function TrainerSchedule() {
   const [sessionLength, setSessionLength] = useState(1)
@@ -11,6 +12,7 @@ export default function TrainerSchedule() {
   const [pendingReservations, setPendingReservations] = useState([])
   const [loading, setLoading] = useState(false)
   const [trainerId, setTrainerId] = useState(null)
+  const [showModal, setShowModal] = useState(false)
 
   // --- 이번 주 월요일 계산 ---
   const getMonday = (d = new Date()) => {
@@ -172,6 +174,10 @@ export default function TrainerSchedule() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-white mb-4">주간 스케줄 등록</h1>
 
+      <div className="flex justify-end mb-2">
+        <Button onClick={() => setShowModal(true)}>+ 수업 시간 추가</Button>
+      </div>
+
       <Card className="p-4">
         <div className="flex items-center gap-3 mb-4">
           <label>세션 길이:</label>
@@ -202,6 +208,15 @@ export default function TrainerSchedule() {
           showStatusColors={{ available: true, pending: true, booked: true }}
         />
       </Card>
-    </div>
-  )
+
+      {showModal && (
+        <AddSessionModal
+            trainerId={trainerId}
+            monday={monday}
+            onClose={() => setShowModal(false)}
+            onSaved={() => fetchSessions(trainerId)}
+        />
+    )}
+  </div>
+)
 }
