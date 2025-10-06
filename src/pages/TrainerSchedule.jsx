@@ -3,10 +3,12 @@ import { supabase } from '../supabaseClient'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 
+
 export default function TrainerSchedule() {
   const [sessionLength, setSessionLength] = useState(1)
   const [selectedSlots, setSelectedSlots] = useState({})
   const [existingSessions, setExistingSessions] = useState([])
+  const [pendingReservations, setPendingReservations] = useState([])
   const [loading, setLoading] = useState(false)
   const [trainerId, setTrainerId] = useState(null)
 
@@ -72,7 +74,7 @@ export default function TrainerSchedule() {
     }
 
     setExistingSessions(sessions || [])
-    setPendingReservatins(reservations || [])
+    setPendingReservations(reservations || [])
   }
 
   const toggleSlot = (day, time) => {
