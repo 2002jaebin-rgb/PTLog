@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { supabase } from '@/supabaseClient'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '@supabaseClient'
 import ScheduleGrid from './ScheduleGrid'
 import Button from './ui/Button'
 import Card from './ui/Card'
@@ -8,8 +8,21 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
   const [sessionLength, setSessionLength] = useState(1)
   const [selectedSlots, setSelectedSlots] = useState({})
   const [loading, setLoading] = useState(false)
+  const [existingSessions, setExistingSessions] = useState([])
 
-  // 시간 문자열 변환
+  // ✅ 기존 세션 불러오기
+  useEffect(() => {
+    if (!trainerId) return
+    const fetchSessions = async () => {
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('trainer_id', trainerId)
+      if (!error && data) setExistingSessions(data)
+    }
+    fetchSessions()
+  }, [trainerId])
+
   const toMinutes = (t) => {
     const [h, m] = t.split(':').map(Number)
     return h * 60 + m
@@ -20,7 +33,6 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
   }
 
-  // 요일 / 날짜 계산 (TrainerSchedule과 동일)
   const dayNames = ['일', '월', '화', '수', '목', '금', '토']
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday)
@@ -31,14 +43,14 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
       date: d.toISOString().split('T')[0],
     }
   })
+
   const startHour = 6
   const endHour = 23
   const dayIndex = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 }
 
-  // 시간 클릭
   const toggleSlot = (day, time) => {
     const key = `${day}-${time}`
-    setSelectedSlots(prev => {
+    setSelectedSlots((prev) => {
       const copy = { ...prev }
       if (copy[key]) delete copy[key]
       else copy[key] = true
@@ -46,11 +58,20 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     })
   }
 
-  // 세션 저장
+  // ✅ 세션 저장 (중복 방지)
   const saveSessions = async () => {
     if (!trainerId) return alert('트레이너 정보가 없습니다.')
-    if (Object.keys(selectedSlots).length === 0) return alert('시간대를 선택해주세요.')
+    if (Object.keys(selectedSlots).length === 0)
+      return alert('시간대를 선택해주세요.')
+
     setLoading(true)
+
+    // 기존 세션 키 생성
+    const existingKeys = new Set(
+      existingSessions.map(
+        (s) => `${s.date}_${s.start_time}_${s.end_time}`
+      )
+    )
 
     const groupedByDay = {}
     Object.keys(selectedSlots).forEach((key) => {
@@ -60,7 +81,6 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     })
 
     const sessionsToInsert = []
-
     Object.entries(groupedByDay).forEach(([day, times]) => {
       const sorted = times.map(toMinutes).sort((a, b) => a - b)
       let start = sorted[0]
@@ -77,19 +97,31 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
           for (let j = 0; j < numSessions; j++) {
             const sStart = start + j * sessionLength * 60
             const sEnd = sStart + sessionLength * 60
-            sessionsToInsert.push({
-              trainer_id: trainerId,
-              date: date.toISOString().split('T')[0],
-              start_time: toTimeString(sStart),
-              end_time: toTimeString(sEnd),
-              session_length: sessionLength,
-              status: 'available',
-            })
+            const newKey = `${date.toISOString().split('T')[0]}_${toTimeString(
+              sStart
+            )}_${toTimeString(sEnd)}`
+            // ✅ 이미 존재하는 세션은 추가 안 함
+            if (!existingKeys.has(newKey)) {
+              sessionsToInsert.push({
+                trainer_id: trainerId,
+                date: date.toISOString().split('T')[0],
+                start_time: toTimeString(sStart),
+                end_time: toTimeString(sEnd),
+                session_length: sessionLength,
+                status: 'available',
+              })
+            }
           }
           start = curr
         }
       }
     })
+
+    if (sessionsToInsert.length === 0) {
+      setLoading(false)
+      alert('이미 등록된 시간대입니다.')
+      return
+    }
 
     const { error } = await supabase.from('sessions').insert(sessionsToInsert)
     setLoading(false)
@@ -97,7 +129,7 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     else {
       alert('수업 시간 등록 완료!')
       setSelectedSlots({})
-      onSaved?.() // TrainerSchedule에서 fetchSessions 실행
+      onSaved?.()
       onClose()
     }
   }
@@ -126,14 +158,18 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
         <div className="border border-gray-700 rounded-md overflow-hidden">
           <ScheduleGrid
             days={days}
-            sessions={[]} // 새 세션 추가니까 기존 표시 X
-            reservations={[]} // 모달은 예약표시 불필요
+            sessions={existingSessions} // ✅ 기존 세션 표시
+            reservations={[]} // 모달은 예약 표시 불필요
             selectedSlots={selectedSlots}
             selectable={true}
             onToggleSlot={toggleSlot}
             startHour={startHour}
             endHour={endHour}
-            showStatusColors={{ available: false, pending: false, booked: false }}
+            showStatusColors={{
+              available: true,
+              pending: false,
+              booked: false,
+            }}
           />
         </div>
 
