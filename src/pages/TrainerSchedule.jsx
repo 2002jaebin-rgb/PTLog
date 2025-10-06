@@ -179,23 +179,6 @@ export default function TrainerSchedule() {
       </div>
 
       <Card className="p-4">
-        <div className="flex items-center gap-3 mb-4">
-          <label>세션 길이:</label>
-          <select
-            className="text-black rounded px-2 py-1"
-            value={sessionLength}
-            onChange={(e) => setSessionLength(Number(e.target.value))}
-          >
-            <option value={0.5}>30분</option>
-            <option value={1}>1시간</option>
-            <option value={1.5}>1시간 30분</option>
-            <option value={2}>2시간</option>
-          </select>
-          <Button onClick={saveSessions} disabled={loading}>
-            {loading ? '저장 중...' : '수업 시간 등록'}
-          </Button>
-        </div>
-
         <ScheduleGrid
           days={days}
           sessions={existingSessions}
