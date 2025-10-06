@@ -67,8 +67,7 @@ export default function Header() {
 
     fetchRole()
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      // ⚠️ 이전 버전의 오타(event) 교정: _event로 정확히 기록
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       t(`Header:onAuthStateChange:${_event}`, { hasSession: !!session })
       setSession(session)
 
@@ -83,11 +82,23 @@ export default function Header() {
 
     return () => {
       t('Header:unmount', { path: location.pathname })
-      listener.subscription.unsubscribe()
+      subscription.unsubscribe()
     }
     // 의존성은 고정: 동작 영향 최소화 (경로 변경마다 재조회하지 않음)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+    if (location.pathname === '/login') {
+        t('Header:render -> login route guard')
+        return (
+          <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
+            <Link to="/" className="font-bold text-lg text-white">PTLog</Link>
+            <Link to="/login" className="text-[var(--text-secondary)] hover:text-white text-sm">
+              로그인
+            </Link>
+          </header>
+        )
+      }
 
   // 세션 없음 → 기본 헤더 (로그인 버튼만)
   if (!session) {
