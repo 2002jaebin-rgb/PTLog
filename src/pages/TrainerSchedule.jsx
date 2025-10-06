@@ -51,7 +51,7 @@ export default function TrainerSchedule() {
 
     const { data, error } = await supabase
       .from('sessions')
-      .select('date, start_time, status')
+      .select('date, start_time, end_time, status')
       .eq('trainer_id', id)
       .gte('date', startDate)
       .lte('date', endStr)
@@ -113,27 +113,44 @@ export default function TrainerSchedule() {
       await fetchSessions(trainerId) // 새로고침 없이 바로 반영
     }
   }
-
-  const getCellColor = (dayKey, time) => {
-    const session = existingSessions.find(
-      (s) => {
-        const dateKey = days.find((d) => d.key === dayKey)?.date
-        return s.date === dateKey && s.start_time === time
-      }
-    )
-    if (!session) return 'bg-gray-800' // 비어있음
-
-    switch (session.status) {
-      case 'available':
-        return 'bg-blue-500'
-      case 'pending':
-        return 'bg-yellow-400'
-      case 'booked':
-        return 'bg-green-500'
-      default:
-        return 'bg-gray-800'
-    }
+// "HH:MM" 또는 "HH:MM:SS" → 분 단위로 변환
+const timeToMinutes = (t) => {
+    if (!t) return 0
+    const [h, m] = t.slice(0, 5).split(':').map(Number)
+    return h * 60 + m
   }
+  
+  // 셀 색상 계산
+const getCellColor = (dayKey, time) => {
+const dateKey = days.find((d) => d.key === dayKey)?.date
+if (!dateKey) return 'bg-gray-800'
+
+const cellStart = timeToMinutes(time)
+const cellEnd = cellStart + 30 // 30분 단위 셀
+
+// 이번 셀과 겹치는 세션 찾기
+const session = existingSessions.find((s) => {
+    if (s.date !== dateKey) return false
+    const sStart = timeToMinutes(s.start_time)
+    const sEnd = timeToMinutes(s.end_time)
+    // 셀 구간과 세션 구간이 겹치면 true
+    return sStart < cellEnd && sEnd > cellStart
+})
+
+if (!session) return 'bg-gray-800'
+
+switch (session.status) {
+    case 'available':
+    return 'bg-blue-500'
+    case 'pending':
+    return 'bg-yellow-400'
+    case 'booked':
+    return 'bg-green-500'
+    default:
+    return 'bg-gray-800'
+}
+}
+  
 
   return (
     <div className="p-6 space-y-6">
