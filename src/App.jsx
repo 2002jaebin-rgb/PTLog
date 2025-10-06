@@ -5,10 +5,10 @@ import {
   Route,
   Navigate,
 } from 'react-router-dom'
-import { supabase } from './supabaseClient'
+import { supabase } from '@/supabaseClient'
 
 // 공통 컴포넌트
-import Header from './components/ui/Header'
+import Header from './components/Header'
 
 // 페이지
 import Login from './pages/Login'

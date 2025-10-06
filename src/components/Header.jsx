@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { supabase } from '../../supabaseClient'
+import { supabase } from '@/supabaseClient'
 import TrainerHeader from './TrainerHeader'
 import ClientHeader from './ClientHeader'
 
