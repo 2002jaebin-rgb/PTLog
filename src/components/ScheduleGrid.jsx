@@ -72,7 +72,7 @@ export default function ScheduleGrid({
     })
 
     const key = `${dayKey}-${time}`
-    let baseColor = 'bg-[rgba(255,255,255,0.04)]' // 비활성 영역 기본색 (약한 대비)
+    let baseColor = 'bg-[rgba(255,255,255,0.07)]' // 비활성 영역 기본색 (약한 대비)
 
     if (selectedSlots[key]) baseColor = 'bg-blue-400'
     else if (session) {
@@ -86,10 +86,10 @@ export default function ScheduleGrid({
 
     // ✅ 시작점 / 끝점 강조 (격자 유지 + 두꺼운 테두리)
     if (firstClick && firstClick.day === dayKey && firstClick.time === time) {
-      return `${baseColor} border-2 border-blue-400 z-10`
+      return `${baseColor} border-2 border-[#3b82f6] ring-2 ring-[#60a5fa] z-10`
     }
     if (secondClick && secondClick.day === dayKey && secondClick.time === time) {
-      return `${baseColor} border-2 border-green-400 z-10`
+      return `${baseColor} border-2 border-[#22c55e] ring-2 ring-[#4ade80] z-10`
     }
 
     return `${baseColor}`
@@ -99,7 +99,7 @@ export default function ScheduleGrid({
 
   return (
     <div className="overflow-x-auto select-none">
-      <table className="min-w-full border border-gray-800 text-sm">
+      <table className="min-w-full border border-gray-600 text-sm">
         <thead>
           <tr>
             <th className="border border-gray-800 p-1 bg-gray-800 w-16">시간</th>
@@ -119,7 +119,7 @@ export default function ScheduleGrid({
                 {/* 상단 30분 */}
                 <tr>
                   <td
-                    className="border border-gray-800 text-center bg-gray-900 w-16"
+                    className="border border-gray-600 text-center bg-[#0f172a] w-16"
                     rowSpan={2}
                   >
                     {hourLabel}
@@ -132,9 +132,9 @@ export default function ScheduleGrid({
                         key={key}
                         data-day={d.key}
                         data-time={hourLabel}
-                        className={`border border-gray-800 h-6 relative transition-all duration-150 ${
+                        className={`border border-gray-600 h-6 relative transition-all duration-150 ${
                           selectable ? 'cursor-pointer' : ''
-                        } ${color} hover:brightness-110`}
+                        } ${color} hover:brightness-125`}
                         onClick={() => handleClick(d.key, hourLabel)}
                       />
                     )
@@ -151,9 +151,9 @@ export default function ScheduleGrid({
                         key={key}
                         data-day={d.key}
                         data-time={halfLabel}
-                        className={`border border-gray-800 h-6 relative transition-all duration-150 ${
+                        className={`border border-gray-600 h-6 relative transition-all duration-150 ${
                           selectable ? 'cursor-pointer' : ''
-                        } ${color} hover:brightness-110`}
+                        } ${color} hover:brightness-125`}
                         onClick={() => handleClick(d.key, halfLabel)}
                       />
                     )
