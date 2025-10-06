@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react'
 
-// 시간 문자열을 분으로 변환
+// 시간 문자열 → 분
 const timeToMinutes = (t) => {
   if (!t) return 0
   const [h, m] = t.slice(0, 5).split(':').map(Number)
   return h * 60 + m
 }
 
-// 분을 "HH:MM" 문자열로 변환
+// 분 → HH:MM
 const toTimeString = (m) => {
   const h = Math.floor(m / 60)
   const min = m % 60
@@ -25,11 +25,11 @@ export default function ScheduleGrid({
   endHour = 23,
   showStatusColors = { available: true, pending: true, booked: true },
 }) {
-  const [firstClick, setFirstClick] = useState(null) // 첫 클릭(시작점)
-  const [secondClick, setSecondClick] = useState(null) // 두 번째 클릭(끝점)
+  const [firstClick, setFirstClick] = useState(null) // 시작점
+  const [secondClick, setSecondClick] = useState(null) // 끝점
   const pendingSet = new Set(reservations.map((r) => r.session_id))
 
-  // ✅ 범위 자동 선택 함수
+  // ✅ 범위 자동 선택
   const selectRange = (day, startTime, endTime) => {
     const startMin = timeToMinutes(startTime)
     const endMin = timeToMinutes(endTime)
@@ -39,26 +39,25 @@ export default function ScheduleGrid({
     }
   }
 
-  // ✅ 클릭 처리 로직 (두 번 클릭으로 범위 선택)
+  // ✅ 클릭 처리
   const handleClick = (day, time) => {
     if (!selectable) return
 
     if (!firstClick) {
-      // 첫 클릭 시 시작점 저장
+      // 첫 클릭 → 시작점 저장
       setFirstClick({ day, time })
       setSecondClick(null)
     } else if (firstClick && !secondClick) {
-      // 두 번째 클릭 → 같은 날이면 범위 선택 실행
+      // 두 번째 클릭 → 범위 지정 후 초기화
       if (firstClick.day === day) {
         selectRange(day, firstClick.time, time)
       }
-      // 다음 선택을 위해 초기화
       setFirstClick(null)
       setSecondClick(null)
     }
   }
 
-  // ✅ 셀 색상 계산
+  // ✅ 셀 색상 계산 + 시각 피드백
   const getCellClass = (dayKey, time) => {
     const dateKey = days.find((d) => d.key === dayKey)?.date
     if (!dateKey) return 'bg-gray-800'
@@ -73,20 +72,27 @@ export default function ScheduleGrid({
     })
 
     const key = `${dayKey}-${time}`
+    let baseColor = 'bg-gray-800'
 
-    if (selectedSlots[key]) return 'bg-blue-400'
-    if (!session) return 'bg-gray-800'
-    if (showStatusColors.pending && pendingSet.has(session.session_id))
-      return 'bg-yellow-400'
-
-    switch (session.status) {
-      case 'booked':
-        return showStatusColors.booked ? 'bg-green-500' : 'bg-gray-800'
-      case 'available':
-        return showStatusColors.available ? 'bg-blue-500' : 'bg-gray-800'
-      default:
-        return 'bg-gray-800'
+    if (selectedSlots[key]) baseColor = 'bg-blue-400'
+    else if (session) {
+      if (showStatusColors.pending && pendingSet.has(session.session_id))
+        baseColor = 'bg-yellow-400'
+      else if (session.status === 'booked' && showStatusColors.booked)
+        baseColor = 'bg-green-500'
+      else if (session.status === 'available' && showStatusColors.available)
+        baseColor = 'bg-blue-500'
     }
+
+    // ✅ 시각 피드백 (시작점 / 끝점 강조)
+    if (firstClick && firstClick.day === dayKey && firstClick.time === time) {
+      return `${baseColor} ring-2 ring-blue-300`
+    }
+    if (secondClick && secondClick.day === dayKey && secondClick.time === time) {
+      return `${baseColor} ring-2 ring-green-300`
+    }
+
+    return baseColor
   }
 
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
@@ -126,7 +132,7 @@ export default function ScheduleGrid({
                         key={key}
                         data-day={d.key}
                         data-time={hourLabel}
-                        className={`border border-gray-700 h-6 ${
+                        className={`border border-gray-700 h-6 transition-all duration-100 ${
                           selectable ? 'cursor-pointer' : ''
                         } ${color}`}
                         onClick={() => handleClick(d.key, hourLabel)}
@@ -145,7 +151,7 @@ export default function ScheduleGrid({
                         key={key}
                         data-day={d.key}
                         data-time={halfLabel}
-                        className={`border border-gray-700 h-6 ${
+                        className={`border border-gray-700 h-6 transition-all duration-100 ${
                           selectable ? 'cursor-pointer' : ''
                         } ${color}`}
                         onClick={() => handleClick(d.key, halfLabel)}
