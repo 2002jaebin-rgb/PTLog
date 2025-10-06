@@ -49,18 +49,30 @@ export default function TrainerSchedule() {
     endDate.setDate(monday.getDate() + 6)
     const endStr = endDate.toISOString().split('T')[0]
 
-    const { data, error } = await supabase
+    const { data: sessions, error:sErr } = await supabase
       .from('sessions')
       .select('date, start_time, end_time, status')
       .eq('trainer_id', id)
       .gte('date', startDate)
       .lte('date', endStr)
 
-    if (error) {
-      console.error('세션 불러오기 실패:', error)
+    if (sErr) {
+      console.error('세션 불러오기 실패:', sErr)
       return
     }
-    setExistingSessions(data || [])
+
+      // 해당 트레이너의 pending 예약들
+    const { data: reservations, error: rErr } = await supabase
+      .from('reservations')
+      .select('session_id, status')
+      .eq('status', 'pending')
+
+    if (rErr) {
+    console.error('예약 불러오기 실패:', rErr)
+    }
+
+    setExistingSessions(sessions || [])
+    setPendingReservatins(reservations || [])
   }
 
   const toggleSlot = (day, time) => {
@@ -137,18 +149,20 @@ const session = existingSessions.find((s) => {
     return sStart < cellEnd && sEnd > cellStart
 })
 
-if (!session) return 'bg-gray-800'
+  // 🔸 pending 여부 체크 (reservations 테이블 기준)
+const hasPending = session
+    ? pendingReservations.some((r) => r.session_id === session.session_id)
+    : false
 
-switch (session.status) {
-    case 'available':
-    return 'bg-blue-500'
-    case 'pending':
-    return 'bg-yellow-400'
-    case 'booked':
-    return 'bg-green-500'
-    default:
-    return 'bg-gray-800'
-}
+  if (hasPending) return 'bg-yellow-400' // pending 예약 있음
+
+  if (!session) return 'bg-gray-800'
+
+  switch (session.status) {
+    case 'available': return 'bg-blue-500'
+    case 'booked': return 'bg-green-500'
+    default: return 'bg-gray-800'
+  }
 }
   
 
