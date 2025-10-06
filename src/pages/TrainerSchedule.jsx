@@ -11,6 +11,7 @@ export default function TrainerSchedule() {
   const [pendingReservations, setPendingReservations] = useState([])
   const [loading, setLoading] = useState(false)
   const [trainerId, setTrainerId] = useState(null)
+  const pendingSet = new Set(pendingReservations.map(r => r.session_id))
 
   // --- 이번 주 월요일 계산 ---
   const getMonday = (d = new Date()) => {
@@ -160,9 +161,8 @@ const session = existingSessions.find((s) => {
 })
 
   // 🔸 pending 여부 체크 (reservations 테이블 기준)
-const hasPending = session
-    ? pendingReservations.some((r) => r.session_id === session.session_id)
-    : false
+const hasPending = session ? pendingSet.has(session.session_id) : false
+
 
   if (hasPending) return 'bg-yellow-400' // pending 예약 있음
 
