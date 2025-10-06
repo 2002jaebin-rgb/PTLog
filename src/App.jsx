@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
 // 공통 컴포넌트
@@ -28,7 +33,6 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // ✅ 초기 세션 불러오기
     const initSession = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
@@ -50,11 +54,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-[var(--bg-dark)] text-[var(--text-primary)]">
-        {/* ✅ Header는 user를 props로 받음 */}
+        {/* ✅ Header는 BrowserRouter 내부로 이동하고 user를 props로 받음 */}
         <Header user={user} />
+
         <main className="p-4 max-w-3xl mx-auto">
           <Routes>
-            <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+            <Route
+              path="/login"
+              element={user ? <Navigate to="/dashboard" /> : <Login />}
+            />
 
             <Route
               path="/dashboard"
@@ -119,7 +127,11 @@ export default function App() {
               }
             />
 
-            <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} />} />
+            <Route
+              path="/"
+              element={<Navigate to={user ? '/dashboard' : '/login'} />}
+            />
+
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>

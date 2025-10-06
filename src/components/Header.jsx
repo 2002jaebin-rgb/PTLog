@@ -10,11 +10,7 @@ export default function Header({ user }) {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // 계측용 로그
-  const t = (label, extra = {}) =>
-    console.log(`[PTLOG][${performance.now().toFixed(1)}ms] ${label}`, extra)
-
-  // ✅ 로그인된 사용자 있을 때만 역할 불러오기
+  // ✅ 역할 불러오기
   useEffect(() => {
     if (!user) {
       setRole(null)
@@ -50,14 +46,14 @@ export default function Header({ user }) {
 
         setRole(null)
       } catch (e) {
-        console.error('Header role fetch error:', e.message)
+        console.error('[PTLog] Header role fetch error:', e.message)
       }
     }
 
     fetchRole()
   }, [user])
 
-  // ✅ 로그인 페이지에서는 간단한 헤더만 표시
+  // ✅ /login 라우트에서는 기본 헤더만 표시
   const isLoginPage =
     location.pathname === '/login' ||
     location.pathname === '/login/' ||
@@ -70,50 +66,63 @@ export default function Header({ user }) {
         <Link to="/" className="font-bold text-lg text-white">
           PTLog
         </Link>
-        <Link to="/login" className="text-[var(--text-secondary)] hover:text-white text-sm">
+        <Link
+          to="/login"
+          className="text-[var(--text-secondary)] hover:text-white text-sm"
+        >
           로그인
         </Link>
       </header>
     )
   }
 
-  // ✅ 세션 없을 때 (비로그인)
+  // ✅ 세션 없을 때
   if (!user) {
     return (
       <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
         <Link to="/" className="font-bold text-lg text-white">
           PTLog
         </Link>
-        <Link to="/login" className="text-[var(--text-secondary)] hover:text-white text-sm">
+        <Link
+          to="/login"
+          className="text-[var(--text-secondary)] hover:text-white text-sm"
+        >
           로그인
         </Link>
       </header>
     )
   }
 
-  // ✅ 로그아웃 처리
+  // ✅ 로그아웃 함수
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('로그아웃 에러:', error.message)
-    } else {
-      console.log('로그아웃 성공')
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      console.log('[PTLog] 로그아웃 성공')
       navigate('/login', { replace: true })
-      window.location.reload()
+      window.location.reload() // ✅ 전체 새로고침으로 세션 초기화
+    } catch (err) {
+      console.error('[PTLog] 로그아웃 오류:', err.message)
     }
   }
 
-  // ✅ 역할별 헤더 분기
-  if (role === 'trainer') return <TrainerHeader trainer={userData} onLogout={handleLogout} />
-  if (role === 'member') return <ClientHeader member={userData} onLogout={handleLogout} />
+  // ✅ 역할별 헤더
+  if (role === 'trainer')
+    return <TrainerHeader trainer={userData} onLogout={handleLogout} />
 
-  // ✅ 역할 없을 때 기본 헤더
+  if (role === 'member')
+    return <ClientHeader member={userData} onLogout={handleLogout} />
+
+  // ✅ 기본 헤더 (역할 정보 불명 시)
   return (
     <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
       <Link to="/" className="font-bold text-lg text-white">
         PTLog
       </Link>
-      <button onClick={handleLogout} className="text-[var(--text-secondary)] hover:text-white text-sm">
+      <button
+        onClick={handleLogout}
+        className="text-[var(--text-secondary)] hover:text-white text-sm"
+      >
         로그아웃
       </button>
     </header>
