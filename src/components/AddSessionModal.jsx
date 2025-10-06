@@ -103,8 +103,8 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-      <Card className="bg-[var(--bg-dark)] text-white w-[800px] max-w-[90%] p-6 rounded-lg shadow-xl">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-6 z-50">
+      <Card className="bg-[var(--bg-dark)] text-white w-[800px] max-w-[90%] max-h-[90vh] overflow-y-auto p-6 rounded-lg shadow-xl">
         <h2 className="text-xl font-bold mb-4">수업 시간 추가</h2>
 
         {/* 세션 길이 설정 */}
