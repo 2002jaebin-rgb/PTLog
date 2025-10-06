@@ -8,6 +8,7 @@ import ClientPage from './pages/ClientPage'
 import Settings from './pages/Settings'
 import TrainerReservation from './pages/TrainerReservation'
 import ClientReservation from './pages/ClientReservation'
+import TrainerSchedule from './pages/TrainerSchedule'
 import { supabase } from './supabaseClient' // supabase client import
 import './styles/theme.css'
 
@@ -81,6 +82,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <ClientPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/trainer-schedule"
+              element={
+                <ProtectedRoute>
+                  <TrainerSchedule />
                 </ProtectedRoute>
               }
             />
