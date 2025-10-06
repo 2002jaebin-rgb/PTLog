@@ -61,7 +61,7 @@ export default function ScheduleGrid({
   const getCellClass = (dayKey, time) => {
     const dateKey = days.find((d) => d.key === dayKey)?.date
     if (!dateKey) return 'bg-gray-800'
-
+  
     const cellStart = timeToMinutes(time)
     const cellEnd = cellStart + 30
     const session = sessions.find((s) => {
@@ -70,10 +70,10 @@ export default function ScheduleGrid({
       const sEnd = timeToMinutes(s.end_time)
       return sStart < cellEnd && sEnd > cellStart
     })
-
+  
     const key = `${dayKey}-${time}`
     let baseColor = 'bg-gray-800'
-
+  
     if (selectedSlots[key]) baseColor = 'bg-blue-400'
     else if (session) {
       if (showStatusColors.pending && pendingSet.has(session.session_id))
@@ -83,17 +83,17 @@ export default function ScheduleGrid({
       else if (session.status === 'available' && showStatusColors.available)
         baseColor = 'bg-blue-500'
     }
-
-    // ✅ 시각 피드백 (시작점 / 끝점 강조)
+  
+    // ✅ 시작점 / 끝점 강조
     if (firstClick && firstClick.day === dayKey && firstClick.time === time) {
-      return `${baseColor} ring-2 ring-blue-300`
+      return `${baseColor} border-4 border-blue-400 ring-2 ring-blue-400`
     }
     if (secondClick && secondClick.day === dayKey && secondClick.time === time) {
-      return `${baseColor} ring-2 ring-green-300`
+      return `${baseColor} border-4 border-green-400 ring-2 ring-green-400`
     }
-
-    return baseColor
-  }
+  
+    return `${baseColor} border-transparent`
+  }  
 
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
 
