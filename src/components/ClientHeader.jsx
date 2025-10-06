@@ -8,23 +8,35 @@ export default function ClientHeader({ member }) {
     console.log(`[PTLOG][${performance.now().toFixed(1)}ms] ${label}`, extra)
 
   const handleLogout = async () => {
-    t('Logout(Client): click -> signOut start', { path: window.location.pathname })
+    t('Logout(Trainer): click -> signOut start', { path: window.location.pathname })
     const t0 = performance.now()
+  
     const { error } = await supabase.auth.signOut()
-    t('Logout(Client): signOut resolved', { error, dt: `${(performance.now() - t0).toFixed(1)}ms` })
-
+    t('Logout(Trainer): signOut resolved', { error, dt: `${(performance.now() - t0).toFixed(1)}ms` })
+  
+    if (error) {
+      console.error('Logout error', error)
+      return
+    }
+  
+    // ✅ signOut 이후 실제 세션이 없어졌는지 확인 후 navigate
+    for (let i = 0; i < 10; i++) {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session) {
+        t('Logout(Trainer): session cleared after signOut', { check: i })
+        navigate('/login', { replace: true })
+        t('Logout(Trainer): navigate("/login") called after session clear')
+        return
+      }
+      t('Logout(Trainer): session still present', { check: i })
+      await new Promise((r) => setTimeout(r, 100))
+    }
+  
+    // ✅ 1초 기다려도 세션이 남아있다면, navigate는 하되 로그 표시
+    t('Logout(Trainer): session not cleared after 1s → fallback navigate')
     navigate('/login', { replace: true })
-    t('Logout(Client): navigate("/login") called')
-
-    setTimeout(async () => {
-      const { data } = await supabase.auth.getSession()
-      t('Logout(Client): T+100ms getSession()', { hasSession: !!data.session })
-    }, 100)
-    setTimeout(async () => {
-      const { data } = await supabase.auth.getSession()
-      t('Logout(Client): T+300ms getSession()', { hasSession: !!data.session })
-    }, 300)
   }
+  
 
   return (
     <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
