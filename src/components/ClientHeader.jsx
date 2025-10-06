@@ -4,10 +4,26 @@ import { supabase } from '../../supabaseClient'
 
 export default function ClientHeader({ member }) {
   const navigate = useNavigate()
+  const t = (label, extra = {}) =>
+    console.log(`[PTLOG][${performance.now().toFixed(1)}ms] ${label}`, extra)
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    navigate('/login')
+    t('Logout(Client): click -> signOut start', { path: window.location.pathname })
+    const t0 = performance.now()
+    const { error } = await supabase.auth.signOut()
+    t('Logout(Client): signOut resolved', { error, dt: `${(performance.now() - t0).toFixed(1)}ms` })
+
+    navigate('/login', { replace: true })
+    t('Logout(Client): navigate("/login") called')
+
+    setTimeout(async () => {
+      const { data } = await supabase.auth.getSession()
+      t('Logout(Client): T+100ms getSession()', { hasSession: !!data.session })
+    }, 100)
+    setTimeout(async () => {
+      const { data } = await supabase.auth.getSession()
+      t('Logout(Client): T+300ms getSession()', { hasSession: !!data.session })
+    }, 300)
   }
 
   return (

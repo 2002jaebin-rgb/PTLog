@@ -4,10 +4,27 @@ import { supabase } from '../../supabaseClient'
 
 export default function TrainerHeader({ trainer }) {
   const navigate = useNavigate()
+  const t = (label, extra = {}) =>
+    console.log(`[PTLOG][${performance.now().toFixed(1)}ms] ${label}`, extra)
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    navigate('/login')
+    t('Logout(Trainer): click -> signOut start', { path: window.location.pathname })
+    const t0 = performance.now()
+    const { error } = await supabase.auth.signOut()
+    t('Logout(Trainer): signOut resolved', { error, dt: `${(performance.now() - t0).toFixed(1)}ms` })
+
+    navigate('/login', { replace: true })
+    t('Logout(Trainer): navigate("/login") called')
+
+    // 세션 스냅샷을 지연 확인해서 타이밍 이슈 판별
+    setTimeout(async () => {
+      const { data } = await supabase.auth.getSession()
+      t('Logout(Trainer): T+100ms getSession()', { hasSession: !!data.session })
+    }, 100)
+    setTimeout(async () => {
+      const { data } = await supabase.auth.getSession()
+      t('Logout(Trainer): T+300ms getSession()', { hasSession: !!data.session })
+    }, 300)
   }
 
   return (
