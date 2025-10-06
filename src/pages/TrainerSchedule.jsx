@@ -6,18 +6,19 @@ import Button from '../components/ui/Button'
 export default function TrainerSchedule() {
   const [sessionLength, setSessionLength] = useState(1)
   const [selectedSlots, setSelectedSlots] = useState({})
+  const [existingSessions, setExistingSessions] = useState([])
   const [loading, setLoading] = useState(false)
   const [trainerId, setTrainerId] = useState(null)
 
-  // 월요일 기준으로 이번주 날짜 계산
+  // --- 이번 주 월요일 계산 ---
   const getMonday = (d = new Date()) => {
     const date = new Date(d)
     const day = date.getDay()
     const diff = date.getDate() - day + (day === 0 ? -6 : 1)
     return new Date(date.setDate(diff))
   }
-
   const monday = getMonday()
+
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday)
     d.setDate(monday.getDate() + i)
@@ -25,6 +26,7 @@ export default function TrainerSchedule() {
     return {
       label: `${d.getMonth() + 1}/${d.getDate()}(${dayNames[d.getDay()]})`,
       key: dayNames[d.getDay()],
+      date: d.toISOString().split('T')[0],
     }
   })
 
@@ -32,12 +34,34 @@ export default function TrainerSchedule() {
   const endHour = 23
 
   useEffect(() => {
-    const getUser = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      setTrainerId(user?.id)
+      if (!user) return
+      setTrainerId(user.id)
+      await fetchSessions(user.id)
     }
-    getUser()
+    init()
   }, [])
+
+  const fetchSessions = async (id) => {
+    const startDate = monday.toISOString().split('T')[0]
+    const endDate = new Date(monday)
+    endDate.setDate(monday.getDate() + 6)
+    const endStr = endDate.toISOString().split('T')[0]
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('date, start_time, status')
+      .eq('trainer_id', id)
+      .gte('date', startDate)
+      .lte('date', endStr)
+
+    if (error) {
+      console.error('세션 불러오기 실패:', error)
+      return
+    }
+    setExistingSessions(data || [])
+  }
 
   const toggleSlot = (day, time) => {
     const key = `${day}-${time}`
@@ -84,7 +108,31 @@ export default function TrainerSchedule() {
     const { error } = await supabase.from('sessions').insert(sessionsToInsert)
     setLoading(false)
     if (error) alert('저장 실패: ' + error.message)
-    else alert('수업 시간 등록 완료!')
+    else {
+      alert('수업 시간 등록 완료!')
+      await fetchSessions(trainerId) // 새로고침 없이 바로 반영
+    }
+  }
+
+  const getCellColor = (dayKey, time) => {
+    const session = existingSessions.find(
+      (s) => {
+        const dateKey = days.find((d) => d.key === dayKey)?.date
+        return s.date === dateKey && s.start_time === time
+      }
+    )
+    if (!session) return 'bg-gray-800' // 비어있음
+
+    switch (session.status) {
+      case 'available':
+        return 'bg-blue-500'
+      case 'pending':
+        return 'bg-yellow-400'
+      case 'booked':
+        return 'bg-green-500'
+      default:
+        return 'bg-gray-800'
+    }
   }
 
   return (
@@ -140,12 +188,11 @@ export default function TrainerSchedule() {
                       {days.map((d) => {
                         const key = `${d.key}-${hourLabel}`
                         const isSelected = selectedSlots[key]
+                        const color = isSelected ? 'bg-blue-400' : getCellColor(d.key, hourLabel)
                         return (
                           <td
                             key={key}
-                            className={`border border-gray-700 cursor-pointer h-6 ${
-                              isSelected ? 'bg-blue-400' : 'bg-gray-800'
-                            }`}
+                            className={`border border-gray-700 cursor-pointer h-6 ${color}`}
                             onClick={() => toggleSlot(d.key, hourLabel)}
                           />
                         )
@@ -156,12 +203,11 @@ export default function TrainerSchedule() {
                       {days.map((d) => {
                         const key = `${d.key}-${nextHalf}`
                         const isSelected = selectedSlots[key]
+                        const color = isSelected ? 'bg-blue-400' : getCellColor(d.key, nextHalf)
                         return (
                           <td
                             key={key}
-                            className={`border border-gray-700 cursor-pointer h-6 ${
-                              isSelected ? 'bg-blue-400' : 'bg-gray-800'
-                            }`}
+                            className={`border border-gray-700 cursor-pointer h-6 ${color}`}
                             onClick={() => toggleSlot(d.key, nextHalf)}
                           />
                         )
