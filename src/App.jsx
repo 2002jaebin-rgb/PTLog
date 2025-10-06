@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { supabase } from './supabaseClient'
+
+// 공통 컴포넌트
 import Header from './components/ui/Header'
+
+// 페이지
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import MemberDetail from './pages/MemberDetail'
@@ -9,98 +14,113 @@ import Settings from './pages/Settings'
 import TrainerReservation from './pages/TrainerReservation'
 import ClientReservation from './pages/ClientReservation'
 import TrainerSchedule from './pages/TrainerSchedule'
-import { supabase } from './supabaseClient' // supabase client import
+
 import './styles/theme.css'
 
-function ProtectedRoute({ children }) {
-  const [loading, setLoading] = useState(true)
-  const [session, setSession] = useState(null)
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    const fetchSession = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (!data.session) {
-        navigate('/login') // 로그인 안 된 상태라면 로그인 페이지로 리다이렉트
-      } else {
-        setSession(data.session)
-      }
-      setLoading(false)
-    }
-    fetchSession()
-  }, [navigate])
-
-  if (loading) {
-    return <div>Loading...</div> // 로딩 중이라면 대기 화면 표시
-  }
-
-  return children // 세션이 있을 경우 자식 컴포넌트 보여주기
+// ✅ 보호 라우트
+function ProtectedRoute({ user, children }) {
+  if (!user) return <Navigate to="/login" replace />
+  return children
 }
 
 export default function App() {
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // ✅ 초기 세션 불러오기
+    const initSession = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
+    }
+    initSession()
+
+    // ✅ 세션 상태 변경 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[PTLog] Auth event:', event)
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (loading) return <div className="text-center mt-10">Loading...</div>
+
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-[var(--bg-dark)] text-[var(--text-primary)]">
-        <Header />
+        {/* ✅ Header는 user를 props로 받음 */}
+        <Header user={user} />
         <main className="p-4 max-w-3xl mx-auto">
           <Routes>
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute user={user}>
                   <Dashboard />
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/member/:id"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute user={user}>
                   <MemberDetail />
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/trainer-reservation"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute user={user}>
                   <TrainerReservation />
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/client-reservation"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute user={user}>
                   <ClientReservation />
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/client"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute user={user}>
                   <ClientPage />
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/trainer-schedule"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute user={user}>
                   <TrainerSchedule />
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/settings"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute user={user}>
                   <Settings />
                 </ProtectedRoute>
               }
             />
+
+            <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} />} />
+            <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
       </div>
