@@ -12,7 +12,7 @@ export default function TrainerSchedule() {
   const [loading, setLoading] = useState(false)
   const [trainerId, setTrainerId] = useState(null)
 
-  // 이번 주 월요일
+  // --- 이번 주 월요일 계산 ---
   const getMonday = (d = new Date()) => {
     const date = new Date(d)
     const day = date.getDay()
@@ -45,13 +45,13 @@ export default function TrainerSchedule() {
     init()
   }, [])
 
+  // --- 세션 / 예약 불러오기 ---
   const fetchSessions = async (id) => {
     const startDate = monday.toISOString().split('T')[0]
     const endDate = new Date(monday)
     endDate.setDate(monday.getDate() + 6)
     const endStr = endDate.toISOString().split('T')[0]
 
-    // 세션
     const { data: sessions, error: sErr } = await supabase
       .from('sessions')
       .select('session_id, date, start_time, end_time, status')
@@ -64,7 +64,6 @@ export default function TrainerSchedule() {
       return
     }
 
-    // 이번 주 세션들에 대한 pending 예약
     const sessionIds = (sessions || []).map(s => s.session_id)
     const { data: reservations, error: rErr } = await supabase
       .from('reservations')
@@ -72,18 +71,16 @@ export default function TrainerSchedule() {
       .in('session_id', sessionIds)
       .eq('status', 'pending')
 
-    if (rErr) {
-      console.error('예약 불러오기 실패:', rErr)
-    }
+    if (rErr) console.error('예약 불러오기 실패:', rErr)
 
     setExistingSessions(sessions || [])
     setPendingReservations(reservations || [])
 
-    // 디버깅 로그(원하면 꺼도 됨)
     console.log('--- sessions ---'); console.table(sessions)
     console.log('--- reservations ---'); console.table(reservations)
   }
 
+  // --- 셀 클릭 시 선택/해제 ---
   const toggleSlot = (day, time) => {
     const key = `${day}-${time}`
     setSelectedSlots(prev => {
@@ -94,35 +91,72 @@ export default function TrainerSchedule() {
     })
   }
 
+  // --- 시간 문자열 ↔ 분 단위 변환 ---
+  const toMinutes = (t) => {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+  }
+  const toTimeString = (m) => {
+    const h = Math.floor(m / 60)
+    const min = m % 60
+    return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+  }
+
+  // --- 세션 저장 로직 ---
   const saveSessions = async () => {
     if (!trainerId) return alert('트레이너 정보가 없습니다.')
-    if (Object.keys(selectedSlots).length === 0) return alert('시간대를 선택해주세요.')
+    if (Object.keys(selectedSlots).length === 0)
+      return alert('시간대를 선택해주세요.')
+
     setLoading(true)
 
-    const dayIndex = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 }
-
-    const sessionsToInsert = Object.keys(selectedSlots).map((key) => {
+    // 1️⃣ 선택된 슬롯을 요일별로 그룹화
+    const groupedByDay = {}
+    Object.keys(selectedSlots).forEach((key) => {
       const [day, time] = key.split('-')
-      const date = new Date(monday)
-      date.setDate(monday.getDate() + dayIndex[day])
+      if (!groupedByDay[day]) groupedByDay[day] = []
+      groupedByDay[day].push(time)
+    })
 
-      const [h, m] = time.split(':').map(Number)
-      const start = new Date(date)
-      start.setHours(h, m, 0, 0)
+    const dayIndex = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 }
+    const sessionsToInsert = []
 
-      const end = new Date(start.getTime() + sessionLength * 60 * 60 * 1000)
-      const startTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-      const endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
+    // 2️⃣ 각 요일별로 연속된 구간 묶고, session_length 단위로 분할
+    Object.entries(groupedByDay).forEach(([day, times]) => {
+      const sorted = times.map(toMinutes).sort((a, b) => a - b)
+      let start = sorted[0]
 
-      return {
-        trainer_id: trainerId,
-        date: date.toISOString().split('T')[0],
-        start_time: startTime,
-        end_time: endTime,
-        session_length: sessionLength,
-        status: 'available',
+      for (let i = 1; i <= sorted.length; i++) {
+        const curr = sorted[i]
+        const prev = sorted[i - 1]
+
+        // 연속 구간 종료 시점
+        if (curr !== prev + 30 || i === sorted.length) {
+          const end = prev + 30
+          const totalRange = end - start
+          const numSessions = Math.floor(totalRange / (sessionLength * 60))
+
+          const date = new Date(monday)
+          date.setDate(monday.getDate() + dayIndex[day])
+
+          for (let j = 0; j < numSessions; j++) {
+            const sStart = start + j * sessionLength * 60
+            const sEnd = sStart + sessionLength * 60
+            sessionsToInsert.push({
+              trainer_id: trainerId,
+              date: date.toISOString().split('T')[0],
+              start_time: toTimeString(sStart),
+              end_time: toTimeString(sEnd),
+              session_length: sessionLength,
+              status: 'available',
+            })
+          }
+          start = curr
+        }
       }
     })
+
+    console.log('🧩 생성 예정 세션:', sessionsToInsert)
 
     const { error } = await supabase.from('sessions').insert(sessionsToInsert)
     setLoading(false)
@@ -130,7 +164,7 @@ export default function TrainerSchedule() {
     else {
       alert('수업 시간 등록 완료!')
       setSelectedSlots({})
-      await fetchSessions(trainerId) // 새로고침 없이 반영
+      await fetchSessions(trainerId)
     }
   }
 
