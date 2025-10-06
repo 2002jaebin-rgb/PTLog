@@ -42,7 +42,8 @@ export default function App() {
 
     // ✅ 세션 상태 변경 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[PTLog] Auth event:', event)
+     console.log('[DEBUG] Auth event fired:', event, 'hasSession', !!session)
+     console.log('[DEBUG] Current supabase.auth.getSession() →', supabase.auth.getSession())
       setUser(session?.user ?? null)
     })
 
