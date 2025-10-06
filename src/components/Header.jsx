@@ -88,10 +88,7 @@ export default function Header() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-    if (
-      location.pathname === '/login' ||
-      location.hash.includes('/login') 
-      ) {
+    if (location.pathname === '/login') {
         t('Header:render -> login route guard')
         return (
           <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
