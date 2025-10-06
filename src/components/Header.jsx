@@ -87,11 +87,13 @@ export default function Header() {
     // 의존성은 고정: 동작 영향 최소화 (경로 변경마다 재조회하지 않음)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  
     const isLoginPage =
     location.pathname === '/login' ||
     location.pathname === '/login/' ||
     location.hash.includes('/login') ||
     window.location.href.includes('/login')
+
     if (isLoginPage) {
         t('Header:render -> login route guard')
         return (
