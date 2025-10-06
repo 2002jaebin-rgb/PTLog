@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { supabase } from '../supabaseClient'
+import { supabase } from '@/supabaseClient'
 import ScheduleGrid from './ScheduleGrid'
 import Button from './ui/Button'
 import Card from './ui/Card'
