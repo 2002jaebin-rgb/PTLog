@@ -75,6 +75,11 @@ export default function TrainerSchedule() {
 
     setExistingSessions(sessions || [])
     setPendingReservations(reservations || [])
+    
+    console.log('--- sessions ---')
+    console.table(sessions)
+    console.log('--- reservations ---')
+    console.table(reservations)
   }
 
   const toggleSlot = (day, time) => {
