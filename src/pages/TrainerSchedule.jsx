@@ -4,19 +4,32 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 
 export default function TrainerSchedule() {
-  const [sessionLength, setSessionLength] = useState(1) // 단위: 시간
+  const [sessionLength, setSessionLength] = useState(1)
   const [selectedSlots, setSelectedSlots] = useState({})
   const [loading, setLoading] = useState(false)
   const [trainerId, setTrainerId] = useState(null)
 
-  const days = ['월', '화', '수', '목', '금', '토', '일']
+  // 월요일 기준으로 이번주 날짜 계산
+  const getMonday = (d = new Date()) => {
+    const date = new Date(d)
+    const day = date.getDay()
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1)
+    return new Date(date.setDate(diff))
+  }
+
+  const monday = getMonday()
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+    return {
+      label: `${d.getMonth() + 1}/${d.getDate()}(${dayNames[d.getDay()]})`,
+      key: dayNames[d.getDay()],
+    }
+  })
+
   const startHour = 6
   const endHour = 23
-  const timeSlots = []
-  for (let h = startHour; h < endHour; h++) {
-    timeSlots.push(`${String(h).padStart(2, '0')}:00`)
-    timeSlots.push(`${String(h).padStart(2, '0')}:30`)
-  }
 
   useEffect(() => {
     const getUser = async () => {
@@ -42,10 +55,6 @@ export default function TrainerSchedule() {
       return alert('시간대를 선택해주세요.')
 
     setLoading(true)
-
-    // 예시: 이번 주 월요일 기준으로 실제 날짜 계산
-    const now = new Date()
-    const monday = new Date(now.setDate(now.getDate() - now.getDay() + 1)) // 월요일
 
     const dayIndex = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 }
 
@@ -75,7 +84,7 @@ export default function TrainerSchedule() {
     const { error } = await supabase.from('sessions').insert(sessionsToInsert)
     setLoading(false)
     if (error) alert('저장 실패: ' + error.message)
-    else alert('세션 등록 완료!')
+    else alert('수업 시간 등록 완료!')
   }
 
   return (
@@ -96,7 +105,7 @@ export default function TrainerSchedule() {
             <option value={2}>2시간</option>
           </select>
           <Button onClick={saveSessions} disabled={loading}>
-            {loading ? '저장 중...' : '세션 등록'}
+            {loading ? '저장 중...' : '수업 시간 등록'}
           </Button>
         </div>
 
@@ -105,35 +114,62 @@ export default function TrainerSchedule() {
           <table className="min-w-full border border-gray-700 text-sm">
             <thead>
               <tr>
-                <th className="border border-gray-700 p-1 bg-gray-800">시간</th>
+                <th className="border border-gray-700 p-1 bg-gray-800 w-16">시간</th>
                 {days.map((d) => (
-                  <th key={d} className="border border-gray-700 p-1 bg-gray-800">
-                    {d}
+                  <th key={d.key} className="border border-gray-700 p-1 bg-gray-800">
+                    {d.label}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {timeSlots.map((t) => (
-                <tr key={t}>
-                  <td className="border border-gray-700 text-center bg-gray-900 w-16">
-                    {t}
-                  </td>
-                  {days.map((d) => {
-                    const key = `${d}-${t}`
-                    const isSelected = selectedSlots[key]
-                    return (
+              {Array.from({ length: (endHour - startHour) }).map((_, i) => {
+                const hour = startHour + i
+                const hourLabel = `${String(hour).padStart(2, '0')}:00`
+                const nextHalf = `${String(hour).padStart(2, '0')}:30`
+                return (
+                  <React.Fragment key={hour}>
+                    {/* 첫 번째 30분 */}
+                    <tr>
                       <td
-                        key={key}
-                        className={`border border-gray-700 cursor-pointer h-6 ${
-                          isSelected ? 'bg-blue-400' : 'bg-gray-800'
-                        }`}
-                        onClick={() => toggleSlot(d, t)}
-                      />
-                    )
-                  })}
-                </tr>
-              ))}
+                        className="border border-gray-700 text-center bg-gray-900 w-16"
+                        rowSpan={2}
+                      >
+                        {hourLabel}
+                      </td>
+                      {days.map((d) => {
+                        const key = `${d.key}-${hourLabel}`
+                        const isSelected = selectedSlots[key]
+                        return (
+                          <td
+                            key={key}
+                            className={`border border-gray-700 cursor-pointer h-6 ${
+                              isSelected ? 'bg-blue-400' : 'bg-gray-800'
+                            }`}
+                            onClick={() => toggleSlot(d.key, hourLabel)}
+                          />
+                        )
+                      })}
+                    </tr>
+                    {/* 두 번째 30분 */}
+                    <tr>
+                      {days.map((d) => {
+                        const key = `${d.key}-${nextHalf}`
+                        const isSelected = selectedSlots[key]
+                        return (
+                          <td
+                            key={key}
+                            className={`border border-gray-700 cursor-pointer h-6 ${
+                              isSelected ? 'bg-blue-400' : 'bg-gray-800'
+                            }`}
+                            onClick={() => toggleSlot(d.key, nextHalf)}
+                          />
+                        )
+                      })}
+                    </tr>
+                  </React.Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
