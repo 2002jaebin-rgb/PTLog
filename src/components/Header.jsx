@@ -10,14 +10,16 @@ export default function Header({ user }) {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // ✅ 역할 불러오기
+  // ✅ user 상태 변화 감시 (null일 때 항상 초기화)
   useEffect(() => {
     if (!user) {
+      console.log('[PTLog] Header reset because user is null')
       setRole(null)
       setUserData(null)
       return
     }
 
+    let cancelled = false
     const fetchRole = async () => {
       try {
         const { data: trainer } = await supabase
@@ -26,6 +28,7 @@ export default function Header({ user }) {
           .eq('id', user.id)
           .single()
 
+        if (cancelled) return
         if (trainer) {
           setRole('trainer')
           setUserData(trainer)
@@ -38,6 +41,7 @@ export default function Header({ user }) {
           .eq('id', user.id)
           .single()
 
+        if (cancelled) return
         if (member) {
           setRole('member')
           setUserData(member)
@@ -51,9 +55,26 @@ export default function Header({ user }) {
     }
 
     fetchRole()
+    return () => {
+      cancelled = true
+    }
   }, [user])
 
-  // ✅ /login 라우트에서는 기본 헤더만 표시
+  // ✅ 로그아웃 처리
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      if (error) throw error
+      console.log('[PTLog] 로그아웃 성공')
+      setRole(null)
+      setUserData(null)
+      navigate('/login', { replace: true })
+    } catch (err) {
+      console.error('[PTLog] 로그아웃 오류:', err.message)
+    }
+  }
+
+  // ✅ /login 라우트에서는 간단한 헤더만 표시
   const isLoginPage =
     location.pathname === '/login' ||
     location.pathname === '/login/' ||
@@ -63,62 +84,38 @@ export default function Header({ user }) {
   if (isLoginPage) {
     return (
       <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
-        <Link to="/" className="font-bold text-lg text-white">
-          PTLog
-        </Link>
-        <Link
-          to="/login"
-          className="text-[var(--text-secondary)] hover:text-white text-sm"
-        >
+        <Link to="/" className="font-bold text-lg text-white">PTLog</Link>
+        <Link to="/login" className="text-[var(--text-secondary)] hover:text-white text-sm">
           로그인
         </Link>
       </header>
     )
   }
 
-  // ✅ 세션 없을 때
-  if (!user) {
+  // ✅ 세션이 완전히 없을 때
+  if (!user || !role) {
     return (
       <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
-        <Link to="/" className="font-bold text-lg text-white">
-          PTLog
-        </Link>
-        <Link
-          to="/login"
-          className="text-[var(--text-secondary)] hover:text-white text-sm"
-        >
+        <Link to="/" className="font-bold text-lg text-white">PTLog</Link>
+        <Link to="/login" className="text-[var(--text-secondary)] hover:text-white text-sm">
           로그인
         </Link>
       </header>
     )
   }
 
-  // ✅ 로그아웃 함수
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      console.log('[PTLog] 로그아웃 성공')
-      navigate('/login', { replace: true })
-      window.location.reload() // ✅ 전체 새로고침으로 세션 초기화
-    } catch (err) {
-      console.error('[PTLog] 로그아웃 오류:', err.message)
-    }
+  // ✅ 역할별 헤더 렌더링
+  if (role === 'trainer') {
+    return <TrainerHeader trainer={userData} onLogout={handleLogout} />
+  }
+  if (role === 'member') {
+    return <ClientHeader member={userData} onLogout={handleLogout} />
   }
 
-  // ✅ 역할별 헤더
-  if (role === 'trainer')
-    return <TrainerHeader trainer={userData} onLogout={handleLogout} />
-
-  if (role === 'member')
-    return <ClientHeader member={userData} onLogout={handleLogout} />
-
-  // ✅ 기본 헤더 (역할 정보 불명 시)
+  // 기본 헤더 (role 로딩 중)
   return (
     <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
-      <Link to="/" className="font-bold text-lg text-white">
-        PTLog
-      </Link>
+      <Link to="/" className="font-bold text-lg text-white">PTLog</Link>
       <button
         onClick={handleLogout}
         className="text-[var(--text-secondary)] hover:text-white text-sm"
