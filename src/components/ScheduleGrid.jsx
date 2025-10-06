@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react'
 
-// 시간 문자열을 분 단위로 변환
+// 시간 → 분
 const timeToMinutes = (t) => {
   if (!t) return 0
   const [h, m] = t.slice(0, 5).split(':').map(Number)
   return h * 60 + m
 }
 
-// 분 단위를 "HH:MM"으로 변환
+// 분 → HH:MM
 const toTimeString = (m) => {
   const h = Math.floor(m / 60)
   const min = m % 60
@@ -27,27 +27,27 @@ export default function ScheduleGrid({
 }) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState(null)
+  const [hoverCell, setHoverCell] = useState(null)
   const [isTouchDevice, setIsTouchDevice] = useState(false)
   const [touchStart, setTouchStart] = useState(null)
   const pendingSet = new Set(reservations.map((r) => r.session_id))
 
-  // ✅ 장치 감지 (PC vs Mobile)
+  // === 장치 감지 ===
   useEffect(() => {
     setIsTouchDevice('ontouchstart' in window)
   }, [])
 
-  // ✅ 범위 자동 선택 (공용 함수)
+  // === 범위 자동 선택 ===
   const selectRange = (day, startTime, endTime) => {
     const startMin = timeToMinutes(startTime)
     const endMin = timeToMinutes(endTime)
     const [min, max] = [Math.min(startMin, endMin), Math.max(startMin, endMin)]
-
     for (let t = min; t <= max; t += 30) {
       onToggleSlot(day, toTimeString(t))
     }
   }
 
-  // === 🖱️ PC: 드래그 방식 ===
+  // === PC: 드래그 방식 ===
   const handleMouseDown = (day, time) => {
     if (!selectable || isTouchDevice) return
     setIsDragging(true)
@@ -59,34 +59,37 @@ export default function ScheduleGrid({
     selectRange(day, dragStart.time, time)
     setIsDragging(false)
     setDragStart(null)
+    setHoverCell(null)
   }
 
-  const handleMouseEnter = (day, time) => {
-    if (!selectable || isTouchDevice || !isDragging || !dragStart) return
-    // 드래그 중에도 연속 적용
+  // ✅ 마우스 이동 중에도 실시간 추적
+  const handleMouseMove = (e) => {
+    if (!isDragging || !dragStart) return
+    const cell = e.target.closest('td[data-day][data-time]')
+    if (!cell) return
+    const { day, time } = cell.dataset
+    if (hoverCell?.day === day && hoverCell?.time === time) return
+    setHoverCell({ day, time })
     selectRange(day, dragStart.time, time)
   }
 
-  // === 📱 모바일: 두 번 탭 방식 ===
+  // === 모바일: 두 번 탭 방식 ===
   const handleTouchStart = (day, time) => {
     if (!selectable || !isTouchDevice) return
     if (!touchStart) {
-      // 첫 번째 터치 → 시작점
+      // 첫 번째 터치
       setTouchStart({ day, time })
     } else {
-      // 두 번째 터치 → 종료점, 자동 선택
-      if (touchStart.day === day) {
-        selectRange(day, touchStart.time, time)
-      }
+      // 두 번째 터치 → 자동 범위 선택
+      if (touchStart.day === day) selectRange(day, touchStart.time, time)
       setTouchStart(null)
     }
   }
 
-  // ✅ 색상 계산
+  // === 색상 계산 ===
   const getCellClass = (dayKey, time) => {
     const dateKey = days.find((d) => d.key === dayKey)?.date
     if (!dateKey) return 'bg-gray-800'
-
     const cellStart = timeToMinutes(time)
     const cellEnd = cellStart + 30
     const session = sessions.find((s) => {
@@ -112,7 +115,7 @@ export default function ScheduleGrid({
     }
   }
 
-  // 시간 블록 생성
+  // === 시간 블록 ===
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
 
   return (
@@ -120,6 +123,7 @@ export default function ScheduleGrid({
       className="overflow-x-auto select-none"
       onMouseLeave={() => setIsDragging(false)}
       onMouseUp={() => setIsDragging(false)}
+      onMouseMove={handleMouseMove}
     >
       <table className="min-w-full border border-gray-700 text-sm">
         <thead>
@@ -152,12 +156,13 @@ export default function ScheduleGrid({
                     return (
                       <td
                         key={key}
+                        data-day={d.key}
+                        data-time={hourLabel}
                         className={`border border-gray-700 h-6 ${
                           selectable ? 'cursor-pointer' : ''
                         } ${color}`}
                         onMouseDown={() => handleMouseDown(d.key, hourLabel)}
                         onMouseUp={() => handleMouseUp(d.key, hourLabel)}
-                        onMouseEnter={() => handleMouseEnter(d.key, hourLabel)}
                         onTouchStart={() => handleTouchStart(d.key, hourLabel)}
                       />
                     )
@@ -172,12 +177,13 @@ export default function ScheduleGrid({
                     return (
                       <td
                         key={key}
+                        data-day={d.key}
+                        data-time={halfLabel}
                         className={`border border-gray-700 h-6 ${
                           selectable ? 'cursor-pointer' : ''
                         } ${color}`}
                         onMouseDown={() => handleMouseDown(d.key, halfLabel)}
                         onMouseUp={() => handleMouseUp(d.key, halfLabel)}
-                        onMouseEnter={() => handleMouseEnter(d.key, halfLabel)}
                         onTouchStart={() => handleTouchStart(d.key, halfLabel)}
                       />
                     )
