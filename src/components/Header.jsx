@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/supabaseClient'
 import TrainerHeader from './TrainerHeader'
 import ClientHeader from './ClientHeader'
+import BottomNav from './BottomNav' // ✅ 추가
 
 export default function Header({ user }) {
   const [role, setRole] = useState(null)        // 'trainer' | 'member' | null
@@ -10,6 +11,7 @@ export default function Header({ user }) {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // 역할 조회 (auth_user_id 기준)
   useEffect(() => {
     let cancelled = false
     if (!user) {
@@ -20,7 +22,6 @@ export default function Header({ user }) {
 
     ;(async () => {
       try {
-        // ✅ 트레이너 판별
         const { data: trainer } = await supabase
           .from('trainers')
           .select('id,name,auth_user_id')
@@ -34,7 +35,6 @@ export default function Header({ user }) {
           return
         }
 
-        // ✅ 회원 판별
         const { data: member } = await supabase
           .from('members')
           .select('id,name,auth_user_id')
@@ -48,7 +48,6 @@ export default function Header({ user }) {
           return
         }
 
-        // 어떤 테이블에도 없으면 null
         setRole(null)
         setUserData(null)
       } catch (e) {
@@ -61,7 +60,7 @@ export default function Header({ user }) {
     return () => { cancelled = true }
   }, [user])
 
-  // ✅ 로그아웃
+  // 로그아웃
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut({ scope: 'global' })
     if (error) {
@@ -71,8 +70,9 @@ export default function Header({ user }) {
     navigate('/login', { replace: true })
   }
 
-  // ✅ 로그인 페이지면 간단 헤더
   const isLoginPage = location.pathname === '/login'
+
+  // 로그인 페이지: 상단 심플 헤더만 (모바일 하단 네비 없음)
   if (isLoginPage) {
     return (
       <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
@@ -82,7 +82,7 @@ export default function Header({ user }) {
     )
   }
 
-  // ✅ 비로그인 또는 역할 미확정 상태
+  // 비로그인 또는 역할 미확정: 상단 심플 헤더만
   if (!user || !role) {
     return (
       <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
@@ -92,17 +92,20 @@ export default function Header({ user }) {
     )
   }
 
-  // ✅ 역할별 헤더
-  if (role === 'trainer') return <TrainerHeader trainer={userData} onLogout={handleLogout} />
-  if (role === 'member')  return <ClientHeader  member={userData} onLogout={handleLogout} />
-
-  // ✅ fallback
+  // 역할별 렌더링
   return (
-    <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
-      <Link to="/" className="font-bold text-lg text-white">PTLog</Link>
-      <button onClick={handleLogout} className="text-[var(--text-secondary)] hover:text-white text-sm">
-        로그아웃
-      </button>
-    </header>
+    <>
+      {/* 데스크톱/태블릿에선 기존 상단 헤더 표시, 모바일에선 숨김 */}
+      <div className="hidden md:block">
+        {role === 'trainer' ? (
+          <TrainerHeader trainer={userData} onLogout={handleLogout} />
+        ) : (
+          <ClientHeader member={userData} onLogout={handleLogout} />
+        )}
+      </div>
+
+      {/* 모바일 전용 하단 네비게이션 (자동 라벨링) */}
+      <BottomNav role={role} />
+    </>
   )
 }
