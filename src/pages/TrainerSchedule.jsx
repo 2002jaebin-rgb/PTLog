@@ -4,6 +4,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import ScheduleGrid from '../components/ScheduleGrid'
 import AddSessionModal from '../components/AddSessionModal'
+import DeleteSessionModal from '../components/DeleteSessionModal'
 
 // 유틸
 const hm = (t) => (t || '').slice(0, 5)
