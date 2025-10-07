@@ -15,6 +15,7 @@ const hmsToHm = (s) => (s || '').slice(0, 5)
 const hmToMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
 const toHm = (m) => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
 const ymdLocal = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+const renderLength = (len) => (len >= 1 ? `${len}시간` : `${len * 60}분`)
 
 export default function ClientReservation() {
   const [loading, setLoading] = useState(true)
@@ -27,9 +28,11 @@ export default function ClientReservation() {
   const [pendingReservations, setPendingReservations] = useState([])
   const [myReservations, setMyReservations] = useState([])
 
-  // 선택된 세션 (블럭)
+  // 블럭 하이라이트용
   const [selectedSlots, setSelectedSlots] = useState({})
-  const [pickedSessionId, setPickedSessionId] = useState(null) // ← 블럭의 session_id 저장
+  // 모달에 띄울 세션
+  const [pickedSession, setPickedSession] = useState(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
   const dayNames = ['일', '월', '화', '수', '목', '금', '토']
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => {
@@ -44,16 +47,15 @@ export default function ClientReservation() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      const { data: memberRow, error: mErr } = await supabase
+      const { data: memberRow } = await supabase
         .from('members').select('id, trainer_id').eq('auth_user_id', user.id).maybeSingle()
 
-      if (mErr || !memberRow) { setLoading(false); alert('회원 정보를 찾을 수 없습니다.'); return }
+      if (!memberRow) { setLoading(false); alert('회원 정보를 찾을 수 없습니다.'); return }
 
       setMemberId(memberRow.id)
       setTrainerId(memberRow.trainer_id || null)
 
       if (memberRow.trainer_id) {
-        // 이름 조회 실패해도 조용히 무시 (UI만)
         const { data: t } = await supabase
           .from('trainers').select('id, name').eq('id', memberRow.trainer_id).maybeSingle()
         if (t?.name) setTrainerName(t.name)
@@ -91,13 +93,15 @@ export default function ClientReservation() {
         .eq('member_id', memberId).order('reservation_time', { ascending: false })
       setMyReservations(myRes || [])
 
-      setSelectedSlots({}); setPickedSessionId(null)
+      setSelectedSlots({})
+      setPickedSession(null)
+      setModalOpen(false)
       setLoading(false)
     }
     if (trainerId && days.length === 7 && memberId) fetchWeek()
   }, [trainerId, monday, days, memberId])
 
-  // ──────────────── 클릭: 한 번 클릭으로 "블럭(세션)" 선택 ────────────────
+  // ──────────────── 클릭: 한 번 클릭 → 그 셀을 포함하는 "세션 블럭" 하이라이트 & 모달 ────────────────
   const onToggleSlot = (dayKey, hhmm) => {
     const dateKey = days.find(d => d.key === dayKey)?.date
     if (!dateKey) return
@@ -112,53 +116,49 @@ export default function ClientReservation() {
       return sStart < cellEnd && sEnd > cellStart
     })
     if (!s) return
-    if (s.status !== 'available') return
-    if (pendingReservations.some(r => r.session_id === s.session_id)) {
-      alert('다른 회원의 예약 대기 중인 시간입니다.')
-      return
-    }
-
-    // 이미 같은 세션이 선택되어 있으면 해제
-    if (pickedSessionId === s.session_id) {
-      setPickedSessionId(null)
-      setSelectedSlots({})
-      return
-    }
 
     // 블럭 전체(30분 단위로) 시각화
     const startM = hmToMin(hmsToHm(s.start_time))
     const endM   = hmToMin(hmsToHm(s.end_time))
     const newSel = {}
-    for (let t = startM; t < endM; t += 30) {
-      newSel[`${dayKey}-${toHm(t)}`] = true
-    }
+    for (let t = startM; t < endM; t += 30) newSel[`${dayKey}-${toHm(t)}`] = true
     setSelectedSlots(newSel)
-    setPickedSessionId(s.session_id)
+
+    setPickedSession(s)
+    setModalOpen(true)
   }
 
+  // 예약 요청 (모달에서만 호출)
   const requestReservation = async () => {
-    if (!memberId || !pickedSessionId) return
+    if (!memberId || !pickedSession) return
 
-    if (myReservations.find(r => r.session_id === pickedSessionId && r.status === 'pending')) {
-      alert('이미 대기 중인 예약이 있습니다.'); return
-    }
-    if (pendingReservations.some(r => r.session_id === pickedSessionId)) {
-      alert('다른 회원의 예약 대기 중인 시간입니다.'); return
-    }
+    // 상태 체크: available + 타회원 pending 없음 + 내 pending 중복 없음
+    const hasPending = pendingReservations.some(r => r.session_id === pickedSession.session_id)
+    const myDup = myReservations.find(r => r.session_id === pickedSession.session_id && r.status === 'pending')
+    if (pickedSession.status !== 'available' || hasPending || myDup) return
 
     const { error } = await supabase
       .from('reservations')
-      .insert([{ session_id: pickedSessionId, member_id: memberId, status: 'pending' }])
-    if (error) return alert('예약 실패: ' + error.message)
+      .insert([{ session_id: pickedSession.session_id, member_id: memberId, status: 'pending' }])
+    if (error) { alert('예약 실패: ' + error.message); return }
 
-    setMyReservations(prev => [{ session_id: pickedSessionId, status: 'pending' }, ...prev])
-    setPendingReservations(prev => [{ session_id: pickedSessionId, status: 'pending' }, ...prev])
+    setPendingReservations(prev => [{ session_id: pickedSession.session_id, status: 'pending' }, ...prev])
+    setMyReservations(prev => [{ session_id: pickedSession.session_id, status: 'pending' }, ...prev])
+
     alert('예약 요청이 전송되었습니다!')
-    setSelectedSlots({}); setPickedSessionId(null)
+    setModalOpen(false)
   }
 
   const startHour = 6, endHour = 23
   if (loading && !memberId) return <div className="p-6">불러오는 중...</div>
+
+  // 모달 상태 도출
+  const modalStatus = (() => {
+    if (!pickedSession) return { text: '-', reservable: false }
+    const isPending = pendingReservations.some(r => r.session_id === pickedSession.session_id)
+    const reservable = pickedSession.status === 'available' && !isPending
+    return { text: reservable ? '예약 가능' : '예약 불가능', reservable }
+  })()
 
   return (
     <div className="p-6 space-y-6">
@@ -168,7 +168,7 @@ export default function ClientReservation() {
         <div className="flex items-center gap-3">
           <span className="text-sm text-[var(--text-secondary)]">내 트레이너</span>
           <span className="px-2 py-1 rounded bg-[rgba(59,130,246,0.2)] text-blue-300">
-            {trainerName || '' /* 이름 로딩 실패 시 그냥 공백 처리 */}
+            {trainerName || ''}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -191,18 +191,64 @@ export default function ClientReservation() {
             endHour={endHour}
             allowSelectingExisting={true}
             showStatusColors={{ available: true, pending: true, booked: true }}
-            selectionMode="single"  // ← 한 번 클릭
+            selectionMode="single"
           />
         ) : (
           <div className="p-6 text-[var(--text-secondary)]">연결된 트레이너가 없습니다.</div>
         )}
       </div>
 
-      <div className="flex justify-end">
-        <Button onClick={requestReservation} disabled={!pickedSessionId} className={!pickedSessionId ? 'opacity-50 cursor-not-allowed' : ''}>
-          {pickedSessionId ? '예약 요청 보내기' : '시간을 선택하세요'}
-        </Button>
-      </div>
+      {/* ⬇️ 모달 */}
+      {modalOpen && pickedSession && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-[#0b1220] text-white shadow-xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-white/10">
+              <h3 className="text-lg font-semibold">세션 정보</h3>
+            </div>
+            <div className="p-5 space-y-3">
+              <Row label="날짜" value={pickedSession.date} />
+              <Row label="시작" value={hmsToHm(pickedSession.start_time)} />
+              <Row label="종료" value={hmsToHm(pickedSession.end_time)} />
+              <Row label="세션 길이" value={renderLength(pickedSession.session_length || 1)} />
+              <Row
+                label="상태"
+                value={modalStatus.text}
+                valueClass={modalStatus.reservable ? 'text-green-400' : 'text-yellow-300'}
+              />
+              {!modalStatus.reservable && (
+                <p className="text-xs text-[var(--text-secondary)]">
+                  * 예약 대기(pending) 또는 이미 예약됨(booked) 상태에서는 예약이 불가합니다.
+                </p>
+              )}
+            </div>
+            <div className="p-4 flex gap-2 justify-end border-t border-white/10">
+              <Button onClick={() => setModalOpen(false)}>닫기</Button>
+              <Button
+                onClick={requestReservation}
+                disabled={!modalStatus.reservable}
+                className={!modalStatus.reservable ? 'opacity-50 cursor-not-allowed' : ''}
+              >
+                예약 요청
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Row({ label, value, valueClass = '' }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-[var(--text-secondary)]">{label}</span>
+      <span className={`text-sm ${valueClass}`}>{value}</span>
     </div>
   )
 }
