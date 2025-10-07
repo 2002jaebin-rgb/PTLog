@@ -116,18 +116,22 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
   }
 
   // === 저장(겹침 확인 → confirm → 삭제 후 삽입) ===
+// AddSessionModal.jsx 중에서 saveSessions만 교체
   const saveSessions = async () => {
     if (!trainerId) return alert('트레이너 정보가 없습니다.')
     if (Object.keys(selectedSlots).length === 0) return alert('시간대를 선택해주세요.')
-
     setLoading(true)
 
+    // 0) 선택 범위를 날짜별 연속 구간으로 빌드
     const rangesByDate = buildSelectedRangesByDate()
+
+    // ✅ 0-1) 이후 모든 계산은 state가 아닌 로컬 변수로 일관되게!
+    let currentSessions = Array.isArray(existingSessions) ? [...existingSessions] : []
 
     // 1) 선택 범위와 겹치는 기존 세션 탐지
     const overlaps = []
     const bookedOverlaps = []
-    existingSessions.forEach((s) => {
+    currentSessions.forEach((s) => {
       const ranges = rangesByDate[s.date]
       if (!ranges) return
       const sStart = toMinutes((s.start_time || '').slice(0, 5))
@@ -139,10 +143,9 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
       }
     })
 
-    // 2) 안내/확인: booked는 유지, non-booked는 삭제 옵션
+    // 2) 안내/확정 제외
     if (bookedOverlaps.length > 0) {
-      // 안내만 (해당 구간은 새 세션 생성에서 자동 제외)
-      console.warn(`확정(booked) 세션 ${bookedOverlaps.length}개와 겹쳐 생성에서 제외됩니다.`)
+      console.warn(`확정(booked) ${bookedOverlaps.length}개 구간은 유지되며 새 생성에서 제외됩니다.`)
     }
 
     if (overlaps.length > 0) {
@@ -168,18 +171,17 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
           alert('기존 세션 삭제 중 오류: ' + delErr.message)
           return
         }
-        // 로컬 상태에서도 제거
-        setExistingSessions((prev) => prev.filter((s) => !idsToDelete.includes(s.session_id)))
+        // ✅ 로컬 변수와 state 모두에서 제거 (state는 화면 동기화용)
+        currentSessions = currentSessions.filter((s) => !idsToDelete.includes(s.session_id))
+        setExistingSessions(currentSessions)
       }
     }
 
-    // 3) (삭제 후 최신 existingKeys 재계산)
+    // 3) (삭제 결과 반영된) 로컬 currentSessions로 키/겹침 재계산
     const existingKeys = new Set(
-      (Array.isArray(existingSessions) ? existingSessions : []).map(
-        (s) => `${s.date}_${s.start_time}_${s.end_time}`
-      )
+      currentSessions.map((s) => `${s.date}_${s.start_time}_${s.end_time}`)
     )
-    const bookedByDate = existingSessions
+    const bookedByDate = currentSessions
       .filter((s) => s.status === 'booked')
       .reduce((acc, s) => {
         if (!acc[s.date]) acc[s.date] = []
@@ -187,7 +189,7 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
         return acc
       }, {})
 
-    // 4) 선택 범위를 session_length 단위로 쪼개어 삽입할 후보 생성
+    // 4) 선택 범위를 session_length 단위로 쪼개어 insert 후보 생성
     const sessionsToInsert = []
     Object.entries(rangesByDate).forEach(([dateStr, ranges]) => {
       ranges.forEach(([blockStart, blockEnd]) => {
@@ -197,7 +199,7 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
           const sStart = blockStart + j * sessionLength * 60
           const sEnd = sStart + sessionLength * 60
 
-          // 4-1) booked와 겹치면 스킵
+          // 4-1) booked 구간과 겹치면 생성 스킵(확정 보호)
           const hasBookedOverlap = (bookedByDate[dateStr] || []).some(
             ([bStart, bEnd]) => sStart < bEnd && sEnd > bStart
           )
