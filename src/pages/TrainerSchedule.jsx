@@ -29,6 +29,7 @@ export default function TrainerSchedule() {
 
   const [loading, setLoading] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   // 셀 클릭 → 세션 상세 모달
   const [inspectedSession, setInspectedSession] = useState(null)
