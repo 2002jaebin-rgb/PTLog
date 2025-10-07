@@ -258,6 +258,7 @@ export default function TrainerSchedule() {
 
       <div className="flex justify-end">
         <Button onClick={() => setShowAddModal(true)}>+ 수업 시간 추가</Button>
+        <Button onClick={() => setShowDeleteModal(true)} className="ml-2 bg-red-600 hover:bg-red-700"> 🗑 수업 시간 삭제</Button>
       </div>
 
       <Card className="p-4">
@@ -344,6 +345,15 @@ export default function TrainerSchedule() {
           monday={monday}
           onClose={() => setShowAddModal(false)}
           onSaved={() => fetchWeek(trainerId)}
+        />
+      )}
+
+      {showDeleteModal && (
+        <DeleteSessionModal
+          trainerId={trainerId}
+          sessions={existingSessions}
+          onClose={() => setShowDeleteModal(false)}
+          onDeleted={() => fetchWeek(trainerId)}
         />
       )}
 
