@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from '@/supabaseClient'
+import { supabase } from '../supabaseClient'
 import ScheduleGrid from './ScheduleGrid'
 import Button from './ui/Button'
 import Card from './ui/Card'
 
 export default function AddSessionModal({ trainerId, monday, onClose, onSaved }) {
-  const [sessionLength, setSessionLength] = useState(1) // 시간 단위(0.5,1,1.5,2)
+  const [sessionLength, setSessionLength] = useState(1) // 0.5, 1, 1.5, 2
   const [selectedSlots, setSelectedSlots] = useState({})
   const [loading, setLoading] = useState(false)
   const [existingSessions, setExistingSessions] = useState([])
+  const [pendingReservations, setPendingReservations] = useState([])
 
   // ===== 유틸 =====
   const toMinutes = (t) => {
@@ -25,7 +26,7 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     const min = m % 60
     return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:00`
   }
-  // 로컬 기준 YYYY-MM-DD
+  // 로컬 YYYY-MM-DD
   const ymdLocal = (d) => {
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -33,20 +34,33 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     return `${y}-${m}-${day}`
   }
 
-  // ===== 기존 세션 불러오기 =====
+  // ===== 데이터 불러오기 =====
   useEffect(() => {
     if (!trainerId) return
-    const fetchSessions = async () => {
-      const { data, error } = await supabase
+    const fetchAll = async () => {
+      const { data: sess, error: e1 } = await supabase
         .from('sessions')
         .select('session_id, trainer_id, date, start_time, end_time, status, session_length')
         .eq('trainer_id', trainerId)
-      if (!error && data) setExistingSessions(data)
+
+      if (!e1 && sess) setExistingSessions(sess)
+
+      // pending 표시를 위해 reservations도 선택(옵션)
+      const sessionIds = (sess || []).map(s => s.session_id)
+      if (sessionIds.length) {
+        const { data: resv, error: e2 } = await supabase
+          .from('reservations')
+          .select('session_id, status')
+          .in('session_id', sessionIds)
+          .eq('status', 'pending')
+        if (!e2 && resv) setPendingReservations(resv)
+      }
     }
-    fetchSessions()
+    fetchAll()
   }, [trainerId])
 
   const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+  const dayIndex = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 }
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday)
     d.setDate(monday.getDate() + i)
@@ -59,7 +73,6 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
 
   const startHour = 6
   const endHour = 23
-  const dayIndex = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 }
 
   const toggleSlot = (day, time) => {
     const key = `${day}-${time}`
@@ -71,21 +84,8 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     })
   }
 
-  // ===== 저장(중복 방지) =====
-  const saveSessions = async () => {
-    if (!trainerId) return alert('트레이너 정보가 없습니다.')
-    if (Object.keys(selectedSlots).length === 0) return alert('시간대를 선택해주세요.')
-
-    setLoading(true)
-
-    // 기존 세션 키(YYYY-MM-DD_HH:MM:SS_HH:MM:SS) set
-    const existingKeys = new Set(
-      existingSessions.map(
-        (s) => `${s.date}_${s.start_time}_${s.end_time}`
-      )
-    )
-
-    // day별로 선택된 슬롯 묶기
+  // === 선택 범위를 날짜별 연속구간으로 정리 (겹침 검사/세션 생성 양쪽에서 사용) ===
+  const buildSelectedRangesByDate = () => {
     const groupedByDay = {}
     Object.keys(selectedSlots).forEach((key) => {
       const [day, time] = key.split('-')
@@ -93,60 +93,145 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
       groupedByDay[day].push(time)
     })
 
-    const sessionsToInsert = []
+    const rangesByDate = {}
     Object.entries(groupedByDay).forEach(([day, times]) => {
-      const sorted = times.map(toMinutes).sort((a, b) => a - b)
-      let start = sorted[0]
-      for (let i = 1; i <= sorted.length; i++) {
-        const curr = sorted[i]
-        const prev = sorted[i - 1]
-        if (curr !== prev + 30 || i === sorted.length) {
+      const sortedMins = times.map(toMinutes).sort((a, b) => a - b)
+      if (sortedMins.length === 0) return
+      let start = sortedMins[0]
+      for (let i = 1; i <= sortedMins.length; i++) {
+        const curr = sortedMins[i]
+        const prev = sortedMins[i - 1]
+        if (curr !== prev + 30 || i === sortedMins.length) {
           const end = prev + 30
-          const totalRange = end - start
-          const numSessions = Math.floor(totalRange / (sessionLength * 60))
-
-          // 해당 요일의 날짜(로컬 YYYY-MM-DD)
           const date = new Date(monday)
           date.setDate(monday.getDate() + dayIndex[day])
           const dateStr = ymdLocal(date)
-
-          for (let j = 0; j < numSessions; j++) {
-            const sStart = start + j * sessionLength * 60   // 분
-            const sEnd = sStart + sessionLength * 60        // 분
-
-            // 중복 비교/저장 모두 HH:MM:SS 로 통일
-            const startHms = toHms(sStart)
-            const endHms = toHms(sEnd)
-            const newKey = `${dateStr}_${startHms}_${endHms}`
-
-            if (!existingKeys.has(newKey)) {
-              sessionsToInsert.push({
-                trainer_id: trainerId,
-                date: dateStr,
-                start_time: startHms,     // time 타입과 일치
-                end_time: endHms,         // time 타입과 일치
-                session_length: sessionLength,
-                status: 'available',
-              })
-            }
-          }
-
+          if (!rangesByDate[dateStr]) rangesByDate[dateStr] = []
+          rangesByDate[dateStr].push([start, end])
           start = curr
         }
       }
     })
+    return rangesByDate
+  }
+
+  // === 저장(겹침 확인 → confirm → 삭제 후 삽입) ===
+  const saveSessions = async () => {
+    if (!trainerId) return alert('트레이너 정보가 없습니다.')
+    if (Object.keys(selectedSlots).length === 0) return alert('시간대를 선택해주세요.')
+
+    setLoading(true)
+
+    const rangesByDate = buildSelectedRangesByDate()
+
+    // 1) 선택 범위와 겹치는 기존 세션 탐지
+    const overlaps = []
+    const bookedOverlaps = []
+    existingSessions.forEach((s) => {
+      const ranges = rangesByDate[s.date]
+      if (!ranges) return
+      const sStart = toMinutes((s.start_time || '').slice(0, 5))
+      const sEnd = toMinutes((s.end_time || '').slice(0, 5))
+      const isOverlap = ranges.some(([rStart, rEnd]) => rStart < sEnd && rEnd > sStart)
+      if (isOverlap) {
+        if (s.status === 'booked') bookedOverlaps.push(s)
+        else overlaps.push(s)
+      }
+    })
+
+    // 2) 안내/확인: booked는 유지, non-booked는 삭제 옵션
+    if (bookedOverlaps.length > 0) {
+      // 안내만 (해당 구간은 새 세션 생성에서 자동 제외)
+      console.warn(`확정(booked) 세션 ${bookedOverlaps.length}개와 겹쳐 생성에서 제외됩니다.`)
+    }
+
+    if (overlaps.length > 0) {
+      const ok = window.confirm(
+        `기존 세션 ${overlaps.length}개가 선택 범위와 겹칩니다.\n` +
+        `덮어쓰기를 진행하면 겹치는 기존 세션(확정 제외)은 삭제됩니다.\n\n` +
+        `진행할까요?`
+      )
+      if (!ok) {
+        setLoading(false)
+        return
+      }
+
+      // 2-1) non-booked 겹침 세션 삭제
+      const idsToDelete = overlaps.map((s) => s.session_id)
+      if (idsToDelete.length) {
+        const { error: delErr } = await supabase
+          .from('sessions')
+          .delete()
+          .in('session_id', idsToDelete)
+        if (delErr) {
+          setLoading(false)
+          alert('기존 세션 삭제 중 오류: ' + delErr.message)
+          return
+        }
+        // 로컬 상태에서도 제거
+        setExistingSessions((prev) => prev.filter((s) => !idsToDelete.includes(s.session_id)))
+      }
+    }
+
+    // 3) (삭제 후 최신 existingKeys 재계산)
+    const existingKeys = new Set(
+      (Array.isArray(existingSessions) ? existingSessions : []).map(
+        (s) => `${s.date}_${s.start_time}_${s.end_time}`
+      )
+    )
+    const bookedByDate = existingSessions
+      .filter((s) => s.status === 'booked')
+      .reduce((acc, s) => {
+        if (!acc[s.date]) acc[s.date] = []
+        acc[s.date].push([toMinutes(s.start_time.slice(0, 5)), toMinutes(s.end_time.slice(0, 5))])
+        return acc
+      }, {})
+
+    // 4) 선택 범위를 session_length 단위로 쪼개어 삽입할 후보 생성
+    const sessionsToInsert = []
+    Object.entries(rangesByDate).forEach(([dateStr, ranges]) => {
+      ranges.forEach(([blockStart, blockEnd]) => {
+        const total = blockEnd - blockStart
+        const num = Math.floor(total / (sessionLength * 60))
+        for (let j = 0; j < num; j++) {
+          const sStart = blockStart + j * sessionLength * 60
+          const sEnd = sStart + sessionLength * 60
+
+          // 4-1) booked와 겹치면 스킵
+          const hasBookedOverlap = (bookedByDate[dateStr] || []).some(
+            ([bStart, bEnd]) => sStart < bEnd && sEnd > bStart
+          )
+          if (hasBookedOverlap) continue
+
+          const startHms = toHms(sStart)
+          const endHms = toHms(sEnd)
+          const key = `${dateStr}_${startHms}_${endHms}`
+          if (!existingKeys.has(key)) {
+            sessionsToInsert.push({
+              trainer_id: trainerId,
+              date: dateStr,
+              start_time: startHms,
+              end_time: endHms,
+              session_length: sessionLength,
+              status: 'available',
+            })
+          }
+        }
+      })
+    })
 
     if (sessionsToInsert.length === 0) {
       setLoading(false)
-      alert('이미 등록된 시간대입니다.')
+      alert('추가할 새로운 세션이 없습니다. (확정 세션과 겹치거나 이미 존재)')
       return
     }
 
-    const { error } = await supabase.from('sessions').insert(sessionsToInsert)
+    // 5) insert
+    const { error: insErr } = await supabase.from('sessions').insert(sessionsToInsert)
     setLoading(false)
 
-    if (error) {
-      alert('저장 실패: ' + error.message)
+    if (insErr) {
+      alert('저장 실패: ' + insErr.message)
     } else {
       alert('수업 시간 등록 완료!')
       setSelectedSlots({})
@@ -175,22 +260,19 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
           </select>
         </div>
 
-        {/* 시간표 (모달 안에서도 기존 세션 표시) */}
+        {/* 시간표: 기존/확정/대기 모두 표시, 기존 위도 선택 가능 */}
         <div className="border border-gray-700 rounded-md overflow-hidden">
           <ScheduleGrid
             days={days}
-            sessions={existingSessions}    // ✅ 기존 DB 세션을 함께 그려서 중복 입력 방지
-            reservations={[]}              // 모달에선 예약 표시 불필요
-            selectedSlots={selectedSlots}  // 새 선택은 시안색으로 표시
+            sessions={existingSessions}         // 기존 + 확정 세션 표시
+            reservations={pendingReservations}  // pending도 노랑으로
+            selectedSlots={selectedSlots}       // 새 선택은 시안
             selectable={true}
             onToggleSlot={toggleSlot}
             startHour={startHour}
             endHour={endHour}
-            showStatusColors={{
-              available: true,
-              pending: false,
-              booked: false,
-            }}
+            showStatusColors={{ available: true, pending: true, booked: true }}
+            allowSelectingExisting={true}       // ← 기존 위도 선택 허용 (겹침 감지용)
           />
         </div>
 

@@ -24,6 +24,7 @@ export default function ScheduleGrid({
   startHour = 6,
   endHour = 23,
   showStatusColors = { available: true, pending: true, booked: true },
+  allowSelectingExisting = false, // ← 추가
 }) {
   const [firstClick, setFirstClick] = useState(null)
   const [secondClick, setSecondClick] = useState(null)
@@ -57,10 +58,10 @@ export default function ScheduleGrid({
     })
   }
 
-  // 클릭 두 번으로 범위 선택 (이미 존재하는 칸은 무시)
+  // 클릭 두 번으로 범위 선택
   const handleClick = (day, time) => {
     if (!selectable) return
-    if (hasExisting(day, time)) return
+    if (!allowSelectingExisting && hasExisting(day, time)) return
 
     if (!firstClick) {
       setFirstClick({ day, time })
@@ -100,11 +101,11 @@ export default function ScheduleGrid({
       } else if (session.status === 'booked' && showStatusColors.booked) {
         baseColor = 'bg-green-500'
       } else if (session.status === 'available' && showStatusColors.available) {
-        baseColor = 'bg-blue-600 hover:bg-blue-500' // 기존 세션(이미 DB에 있음)
+        baseColor = 'bg-blue-600 hover:bg-blue-500' // 기존 세션
       }
     }
 
-    // 시작/끝점 강조 (격자 유지 + 대비 강한 테두리)
+    // 시작/끝점 강조
     if (firstClick && firstClick.day === dayKey && firstClick.time === time)
       return `${baseColor} border-2 border-[#3b82f6] ring-2 ring-[#60a5fa] z-10`
     if (secondClick && secondClick.day === dayKey && secondClick.time === time)
