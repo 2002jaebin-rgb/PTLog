@@ -24,14 +24,14 @@ export default function ScheduleGrid({
   startHour = 6,
   endHour = 23,
   showStatusColors = { available: true, pending: true, booked: true },
-  allowSelectingExisting = false, // ← 추가
+  allowSelectingExisting = false,
 }) {
   const [firstClick, setFirstClick] = useState(null)
   const [secondClick, setSecondClick] = useState(null)
   const pendingSet = new Set(reservations.map((r) => r.session_id))
 
-  // 시작~끝 범위 선택
-  const selectRange = (day, startTime, endTime) => {
+  // 같은 요일 내 범위 선택
+  const selectRangeSameDay = (day, startTime, endTime) => {
     const startMin = timeToMinutes(startTime)
     const endMin = timeToMinutes(endTime)
     const [min, max] = [Math.min(startMin, endMin), Math.max(startMin, endMin)]
@@ -40,25 +40,41 @@ export default function ScheduleGrid({
     }
   }
 
-  // 해당 셀에 이미 등록된 세션이 있는지 확인 (sessions의 time은 HH:MM:SS 일 수 있음)
+  // 서로 다른 요일까지 포함하는 "직사각형" 선택
+  const selectRangeAcrossDays = (first, second) => {
+    const idx1 = days.findIndex((d) => d.key === first.day)
+    const idx2 = days.findIndex((d) => d.key === second.day)
+    if (idx1 === -1 || idx2 === -1) return
+
+    const [diStart, diEnd] = [Math.min(idx1, idx2), Math.max(idx1, idx2)]
+    const [minTime, maxTime] = [
+      Math.min(timeToMinutes(first.time), timeToMinutes(second.time)),
+      Math.max(timeToMinutes(first.time), timeToMinutes(second.time)),
+    ]
+
+    for (let di = diStart; di <= diEnd; di++) {
+      const dayKey = days[di].key
+      for (let t = minTime; t <= maxTime; t += 30) {
+        onToggleSlot(dayKey, toTimeString(t))
+      }
+    }
+  }
+
+  // 해당 셀에 이미 등록된 세션이 있는지 (sessions의 time은 HH:MM:SS일 수 있음)
   const hasExisting = (dayKey, time) => {
     const dateKey = days.find((d) => d.key === dayKey)?.date
     if (!dateKey) return false
-
     const cellStart = timeToMinutes(time)
     const cellEnd = cellStart + 30
-
     return sessions.some((s) => {
       if (s.date !== dateKey) return false
-      const sStartStr = (s.start_time || '').slice(0, 5) // "09:00:00" → "09:00"
-      const sEndStr = (s.end_time || '').slice(0, 5)
-      const sStart = timeToMinutes(sStartStr)
-      const sEnd = timeToMinutes(sEndStr)
+      const sStart = timeToMinutes((s.start_time || '').slice(0, 5))
+      const sEnd = timeToMinutes((s.end_time || '').slice(0, 5))
       return sStart < cellEnd && sEnd > cellStart
     })
   }
 
-  // 클릭 두 번으로 범위 선택
+  // 클릭 두 번으로 범위 선택 (이제 요일跨 선택 지원)
   const handleClick = (day, time) => {
     if (!selectable) return
     if (!allowSelectingExisting && hasExisting(day, time)) return
@@ -66,9 +82,15 @@ export default function ScheduleGrid({
     if (!firstClick) {
       setFirstClick({ day, time })
       setSecondClick(null)
-    } else if (firstClick && !secondClick) {
-      if (firstClick.day === day) {
-        selectRange(day, firstClick.time, time)
+      return
+    }
+
+    if (firstClick && !secondClick) {
+      const sameDay = firstClick.day === day
+      if (sameDay) {
+        selectRangeSameDay(day, firstClick.time, time)
+      } else {
+        selectRangeAcrossDays(firstClick, { day, time })
       }
       setFirstClick(null)
       setSecondClick(null)
@@ -105,7 +127,6 @@ export default function ScheduleGrid({
       }
     }
 
-    // 시작/끝점 강조
     if (firstClick && firstClick.day === dayKey && firstClick.time === time)
       return `${baseColor} border-2 border-[#3b82f6] ring-2 ring-[#60a5fa] z-10`
     if (secondClick && secondClick.day === dayKey && secondClick.time === time)

@@ -115,8 +115,6 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     return rangesByDate
   }
 
-  // === 저장(겹침 확인 → confirm → 삭제 후 삽입) ===
-// AddSessionModal.jsx 중에서 saveSessions만 교체
   const saveSessions = async () => {
     if (!trainerId) return alert('트레이너 정보가 없습니다.')
     if (Object.keys(selectedSlots).length === 0) return alert('시간대를 선택해주세요.')
