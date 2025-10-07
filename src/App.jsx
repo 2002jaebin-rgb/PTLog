@@ -1,16 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/supabaseClient'
 
-// 공통 컴포넌트
 import Header from './components/Header'
 
-// 페이지
+// 페이지들
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import MemberDetail from './pages/MemberDetail'
@@ -22,7 +16,7 @@ import TrainerSchedule from './pages/TrainerSchedule'
 
 import './styles/theme.css'
 
-// ✅ 보호 라우트
+// 보호 라우트
 function ProtectedRoute({ user, children }) {
   if (!user) return <Navigate to="/login" replace />
   return children
@@ -33,20 +27,17 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const initSession = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      setUser(user ?? null)
       setLoading(false)
     }
-    initSession()
+    init()
 
-    // ✅ 세션 상태 변경 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-     console.log('[DEBUG] Auth event fired:', event, 'hasSession', !!session)
-     console.log('[DEBUG] Current supabase.auth.getSession() →', supabase.auth.getSession())
+      console.log('[PTLog] Auth event:', event)
       setUser(session?.user ?? null)
     })
-
     return () => subscription.unsubscribe()
   }, [])
 
@@ -55,84 +46,22 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-[var(--bg-dark)] text-[var(--text-primary)]">
-        {/* ✅ Header는 BrowserRouter 내부로 이동하고 user를 props로 받음 */}
-        <Header key={user ? user.id : 'no-user'} user={user} />
+        {/* 전역 user 상태를 Header에 전달 */}
+        <Header user={user} />
 
         <main className="p-4 max-w-3xl mx-auto">
           <Routes>
-            <Route
-              path="/login"
-              element={user ? <Navigate to="/dashboard" /> : <Login />}
-            />
+            <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
 
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute user={user}>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/dashboard" element={<ProtectedRoute user={user}><Dashboard /></ProtectedRoute>} />
+            <Route path="/member/:id" element={<ProtectedRoute user={user}><MemberDetail /></ProtectedRoute>} />
+            <Route path="/trainer-reservation" element={<ProtectedRoute user={user}><TrainerReservation /></ProtectedRoute>} />
+            <Route path="/client-reservation" element={<ProtectedRoute user={user}><ClientReservation /></ProtectedRoute>} />
+            <Route path="/client" element={<ProtectedRoute user={user}><ClientPage /></ProtectedRoute>} />
+            <Route path="/trainer-schedule" element={<ProtectedRoute user={user}><TrainerSchedule /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute user={user}><Settings /></ProtectedRoute>} />
 
-            <Route
-              path="/member/:id"
-              element={
-                <ProtectedRoute user={user}>
-                  <MemberDetail />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/trainer-reservation"
-              element={
-                <ProtectedRoute user={user}>
-                  <TrainerReservation />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/client-reservation"
-              element={
-                <ProtectedRoute user={user}>
-                  <ClientReservation />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/client"
-              element={
-                <ProtectedRoute user={user}>
-                  <ClientPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/trainer-schedule"
-              element={
-                <ProtectedRoute user={user}>
-                  <TrainerSchedule />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute user={user}>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/"
-              element={<Navigate to={user ? '/dashboard' : '/login'} />}
-            />
-
+            <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
