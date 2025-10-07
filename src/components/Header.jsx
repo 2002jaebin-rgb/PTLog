@@ -5,13 +5,11 @@ import TrainerHeader from './TrainerHeader'
 import ClientHeader from './ClientHeader'
 
 export default function Header({ user }) {
-  // ✅ 모든 훅은 최상단에서 “항상” 호출
   const [role, setRole] = useState(null)        // 'trainer' | 'member' | null
   const [userData, setUserData] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
 
-  // ✅ 역할 조회 훅도 최상단에서 무조건 호출 (조기 return 금지)
   useEffect(() => {
     let cancelled = false
     if (!user) {
@@ -22,10 +20,11 @@ export default function Header({ user }) {
 
     ;(async () => {
       try {
+        // ✅ 트레이너 판별
         const { data: trainer } = await supabase
           .from('trainers')
-          .select('id,name')
-          .eq('id', user.id)
+          .select('id,name,auth_user_id')
+          .eq('auth_user_id', user.id)
           .single()
 
         if (cancelled) return
@@ -35,10 +34,11 @@ export default function Header({ user }) {
           return
         }
 
+        // ✅ 회원 판별
         const { data: member } = await supabase
           .from('members')
-          .select('id,name')
-          .eq('id', user.id)
+          .select('id,name,auth_user_id')
+          .eq('auth_user_id', user.id)
           .single()
 
         if (cancelled) return
@@ -48,6 +48,7 @@ export default function Header({ user }) {
           return
         }
 
+        // 어떤 테이블에도 없으면 null
         setRole(null)
         setUserData(null)
       } catch (e) {
@@ -60,7 +61,7 @@ export default function Header({ user }) {
     return () => { cancelled = true }
   }, [user])
 
-  // ✅ 로그아웃은 부모에서만 처리 → 자식은 onLogout만 호출
+  // ✅ 로그아웃
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut({ scope: 'global' })
     if (error) {
@@ -70,9 +71,8 @@ export default function Header({ user }) {
     navigate('/login', { replace: true })
   }
 
-  // ✅ 이제부터 분기 (훅 호출 이후)
+  // ✅ 로그인 페이지면 간단 헤더
   const isLoginPage = location.pathname === '/login'
-
   if (isLoginPage) {
     return (
       <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
@@ -82,6 +82,7 @@ export default function Header({ user }) {
     )
   }
 
+  // ✅ 비로그인 또는 역할 미확정 상태
   if (!user || !role) {
     return (
       <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
@@ -91,10 +92,11 @@ export default function Header({ user }) {
     )
   }
 
+  // ✅ 역할별 헤더
   if (role === 'trainer') return <TrainerHeader trainer={userData} onLogout={handleLogout} />
   if (role === 'member')  return <ClientHeader  member={userData} onLogout={handleLogout} />
 
-  // role 판단 중 기본 헤더
+  // ✅ fallback
   return (
     <header className="bg-[var(--card-dark)] border-b border-[var(--border-color)] px-4 py-3 flex justify-between items-center">
       <Link to="/" className="font-bold text-lg text-white">PTLog</Link>
