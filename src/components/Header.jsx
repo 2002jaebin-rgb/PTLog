@@ -62,16 +62,12 @@ export default function Header({ user }) {
 
   // ✅ 로그아웃 처리
   const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut({ scope: 'global' })
-      if (error) throw error
-      console.log('[PTLog] 로그아웃 성공')
-      setRole(null)
-      setUserData(null)
-      navigate('/login', { replace: true })
-    } catch (err) {
-      console.error('[PTLog] 로그아웃 오류:', err.message)
+    const { error } = await supabase.auth.signOut({ scope: 'global' })
+    if (error) {
+      console.error('[PTLog] 로그아웃 오류:', error.message)
+      return
     }
+    navigate('/login', { replace: true })
   }
 
   // ✅ /login 라우트에서는 간단한 헤더만 표시
