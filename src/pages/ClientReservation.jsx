@@ -4,25 +4,20 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import ScheduleGrid from '../components/ScheduleGrid'
 
-// 유틸: 로컬 기준 월요일 시작 날짜
+// 로컬 기준 가장 가까운 월요일
 const getMonday = (date = new Date()) => {
   const d = new Date(date)
-  const day = d.getDay() || 7 // Sun=0 → 7
+  const day = d.getDay() || 7 // Sun=0 -> 7
   if (day !== 1) d.setDate(d.getDate() - (day - 1))
   d.setHours(0, 0, 0, 0)
   return d
 }
 
-// "HH:MM:SS" → "HH:MM"
 const hmsToHm = (s) => (s || '').slice(0, 5)
-
-// "HH:MM" → 분
 const timeToMinutes = (t) => {
   const [h, m] = t.split(':').map(Number)
   return h * 60 + m
 }
-
-// "YYYY-MM-DD" (로컬)
 const ymdLocal = (d) => {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -32,20 +27,19 @@ const ymdLocal = (d) => {
 
 export default function ClientReservation() {
   const [loading, setLoading] = useState(true)
+
+  // 로그인 회원과 연결된 트레이너
   const [memberId, setMemberId] = useState(null)
+  const [trainerId, setTrainerId] = useState(null)
+  const [trainerName, setTrainerName] = useState('')
 
-  const [trainers, setTrainers] = useState([])
-  const [selectedTrainerId, setSelectedTrainerId] = useState(null)
-
+  // 달력/세션/예약
   const [monday, setMonday] = useState(getMonday())
-  const [sessions, setSessions] = useState([])                  // 선택된 트레이너의 주간 sessions (모든 status)
-  const [pendingReservations, setPendingReservations] = useState([]) // 이 트레이너 세션들의 pending 목록 (누구의 것이든)
-  const [myReservations, setMyReservations] = useState([])      // 내가 만든 예약들
+  const [sessions, setSessions] = useState([])
+  const [pendingReservations, setPendingReservations] = useState([])
+  const [myReservations, setMyReservations] = useState([])
+  const [selectedSlots, setSelectedSlots] = useState({}) // 한 칸만 선택
 
-  // 그리드 선택 상태 (한 칸만 선택)
-  const [selectedSlots, setSelectedSlots] = useState({})
-
-  // 주간 day 메타
   const dayNames = ['일', '월', '화', '수', '목', '금', '토']
   const days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -60,36 +54,39 @@ export default function ClientReservation() {
   }, [monday])
 
   // ─────────────────────────────────────────────────────────────
-  // 초기화: auth → member → trainers
+  // 1) 로그인 → 회원 → trainer_id & 트레이너 이름
   useEffect(() => {
     const init = async () => {
       setLoading(true)
-
-      const { data: { user }, error: userErr } = await supabase.auth.getUser()
-      if (userErr || !user) {
-        console.error('auth.getUser 실패', userErr)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
         setLoading(false)
         return
       }
-      const { data: memberRow } = await supabase
+
+      // members에서 trainer_id 포함 조회
+      const { data: memberRow, error: mErr } = await supabase
         .from('members')
-        .select('id')
+        .select('id, trainer_id')
         .eq('auth_user_id', user.id)
         .maybeSingle()
-      if (!memberRow) {
-        alert('회원 정보가 없습니다.')
+
+      if (mErr || !memberRow) {
         setLoading(false)
+        alert('회원 정보를 찾을 수 없습니다.')
         return
       }
       setMemberId(memberRow.id)
+      setTrainerId(memberRow.trainer_id || null)
 
-      const { data: trainerRows } = await supabase
-        .from('trainers')
-        .select('id, name')
-        .order('created_at', { ascending: true })
-
-      setTrainers(trainerRows || [])
-      if (trainerRows?.length) setSelectedTrainerId(trainerRows[0].id)
+      if (memberRow.trainer_id) {
+        const { data: t, error: tErr } = await supabase
+          .from('trainers')
+          .select('id, name')
+          .eq('id', memberRow.trainer_id)
+          .maybeSingle()
+        if (!tErr && t) setTrainerName(t.name || '')
+      }
 
       setLoading(false)
     }
@@ -97,26 +94,26 @@ export default function ClientReservation() {
   }, [])
   // ─────────────────────────────────────────────────────────────
 
-  // 선택된 트레이너/주가 바뀌면 주간 세션 & pending & 내 예약 불러오기
+  // 2) 주간 데이터 로드 (trainerId, monday가 정해지면)
   useEffect(() => {
     const fetchWeekData = async () => {
-      if (!selectedTrainerId) return
+      if (!trainerId) return
       setLoading(true)
 
       const start = days[0].date
       const end = days[6].date
 
-      // 1) 트레이너의 해당 주간 세션 전부 (available/pending/booked)
+      // 트레이너의 주간 세션 (available/pending/booked)
       const { data: sessRows } = await supabase
         .from('sessions')
         .select('session_id, trainer_id, date, start_time, end_time, status, session_length')
-        .eq('trainer_id', selectedTrainerId)
+        .eq('trainer_id', trainerId)
         .gte('date', start)
         .lte('date', end)
 
       setSessions(sessRows || [])
 
-      // 2) 해당 세션 내 pending 예약 (누가 올린 것이든 표시용)
+      // 해당 세션들의 pending (누구의 것이든)
       const sessionIds = (sessRows || []).map(s => s.session_id)
       let pending = []
       if (sessionIds.length) {
@@ -129,7 +126,7 @@ export default function ClientReservation() {
       }
       setPendingReservations(pending)
 
-      // 3) 내가 만든 예약들 (상태 표시용)
+      // 나의 예약 현황
       const { data: myRes } = await supabase
         .from('reservations')
         .select('reservation_id, session_id, status')
@@ -137,17 +134,14 @@ export default function ClientReservation() {
         .order('reservation_time', { ascending: false })
 
       setMyReservations(myRes || [])
-
-      // 선택 초기화
       setSelectedSlots({})
       setLoading(false)
     }
-    if (days.length === 7) fetchWeekData()
-  }, [selectedTrainerId, monday, days, memberId])
+    if (trainerId && days.length === 7 && memberId) fetchWeekData()
+  }, [trainerId, monday, days, memberId])
 
-  // 셀 클릭 → 한 칸만 선택되도록 토글
+  // 3) 셀 클릭 → available & 타회원 pending 없음일 때만 한 칸 선택
   const onToggleSlot = (dayKey, hhmm) => {
-    // 어떤 세션이랑 매칭되는지 확인 (available인 경우만 선택 허용)
     const dateKey = days.find(d => d.key === dayKey)?.date
     if (!dateKey) return
 
@@ -160,69 +154,60 @@ export default function ClientReservation() {
       const sEnd   = timeToMinutes(hmsToHm(s.end_time))
       return sStart < cellEnd && sEnd > cellStart
     })
+    if (!found) return
+    if (found.status !== 'available') return
 
-    if (!found) {
-      // 빈 칸은 선택 무효
-      return
-    }
-    if (found.status !== 'available') {
-      // booked/pending 세션은 선택 불가
-      return
-    }
-
-    // 다른 사람이 이미 pending 넣어둔 세션은 차단
     const someonePending = pendingReservations.some(r => r.session_id === found.session_id)
     if (someonePending) {
       alert('다른 회원의 예약 대기 중인 시간입니다.')
       return
     }
 
-    // 한 칸만 선택되게
     const key = `${dayKey}-${hhmm}`
-    setSelectedSlots(prev => {
-      if (prev[key]) return {} // 다시 누르면 해제
-      return { [key]: true }
-    })
+    setSelectedSlots(prev => (prev[key] ? {} : { [key]: true }))
   }
 
-  // 현재 선택된 칸 → session_id 추출
+  // 4) 선택된 세션 id
   const selectedSessionId = useMemo(() => {
     const key = Object.keys(selectedSlots)[0]
     if (!key) return null
     const [dayKey, hhmm] = key.split('-')
     const dateKey = days.find(d => d.key === dayKey)?.date
     if (!dateKey) return null
+
     const cellStart = timeToMinutes(hhmm)
     const cellEnd = cellStart + 30
-    const found = sessions.find(s => {
-      if (s.date !== dateKey) return false
-      const sStart = timeToMinutes(hmsToHm(s.start_time))
-      const sEnd   = timeToMinutes(hmsToHm(s.end_time))
-      return sStart < cellEnd && sEnd > cellStart && s.status === 'available'
+    const s = sessions.find(ss => {
+      if (ss.date !== dateKey) return false
+      const sStart = timeToMinutes(hmsToHm(ss.start_time))
+      const sEnd   = timeToMinutes(hmsToHm(ss.end_time))
+      return sStart < cellEnd && sEnd > cellStart && ss.status === 'available'
     })
-    return found?.session_id ?? null
+    return s?.session_id ?? null
   }, [selectedSlots, days, sessions])
 
+  // 5) 예약 요청
   const requestReservation = async () => {
     if (!memberId || !selectedSessionId) return
+
     // 내 중복 요청 방지
     const myDup = myReservations.find(r => r.session_id === selectedSessionId && r.status === 'pending')
     if (myDup) {
       alert('이미 대기 중인 예약이 있습니다.')
       return
     }
-    // 타회원 pending 차단 (이중)
+    // 타회원 pending 차단
     const someonePending = pendingReservations.some(r => r.session_id === selectedSessionId)
     if (someonePending) {
       alert('다른 회원의 예약 대기 중인 시간입니다.')
       return
     }
-    // 서버 insert
-    const { error } = await supabase.from('reservations').insert([
-      { session_id: selectedSessionId, member_id: memberId, status: 'pending' }
-    ])
+
+    const { error } = await supabase
+      .from('reservations')
+      .insert([{ session_id: selectedSessionId, member_id: memberId, status: 'pending' }])
     if (error) return alert('예약 실패: ' + error.message)
-    // 로컬 업데이트
+
     setMyReservations(prev => [{ session_id: selectedSessionId, status: 'pending' }, ...prev])
     setPendingReservations(prev => [{ session_id: selectedSessionId, status: 'pending' }, ...prev])
     alert('예약 요청이 전송되었습니다!')
@@ -232,27 +217,21 @@ export default function ClientReservation() {
   const startHour = 6
   const endHour = 23
 
-  // UI
   if (loading && !memberId) return <div className="p-6">불러오는 중...</div>
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-2">세션 예약</h1>
 
-      {/* 트레이너 선택 + 주간 이동 */}
+      {/* 상단 정보: 내 트레이너 + 주간 이동 */}
       <Card className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
-          <label className="text-sm text-[var(--text-secondary)]">트레이너</label>
-          <select
-            className="text-black rounded px-2 py-1"
-            value={selectedTrainerId || ''}
-            onChange={(e) => setSelectedTrainerId(e.target.value)}
-          >
-            {trainers.map(t => (
-              <option key={t.id} value={t.id}>{t.name || t.id}</option>
-            ))}
-          </select>
+          <span className="text-sm text-[var(--text-secondary)]">내 트레이너</span>
+          <span className="px-2 py-1 rounded bg-[rgba(59,130,246,0.2)] text-blue-300">
+            {trainerName || (trainerId ? trainerId : '지정되지 않음')}
+          </span>
         </div>
+
         <div className="flex items-center gap-2">
           <Button onClick={() => setMonday(prev => {
             const d = new Date(prev); d.setDate(prev.getDate() - 7); return getMonday(d)
@@ -272,19 +251,24 @@ export default function ClientReservation() {
 
       {/* 주간 그리드 */}
       <div className="border border-gray-700 rounded-md overflow-hidden">
-        <ScheduleGrid
-          days={days}
-          sessions={sessions}
-          reservations={pendingReservations}     // 노란색으로 pending 표시
-          selectedSlots={selectedSlots}
-          selectable={true}
-          onToggleSlot={onToggleSlot}
-          startHour={startHour}
-          endHour={endHour}
-          // 클라이언트 화면에서는 기존 세션 위 선택 불가 (헷갈림 방지)
-          allowSelectingExisting={false}
-          showStatusColors={{ available: true, pending: true, booked: true }}
-        />
+        {trainerId ? (
+          <ScheduleGrid
+            days={days}
+            sessions={sessions}
+            reservations={pendingReservations}
+            selectedSlots={selectedSlots}
+            selectable={true}
+            onToggleSlot={onToggleSlot}
+            startHour={startHour}
+            endHour={endHour}
+            allowSelectingExisting={false}
+            showStatusColors={{ available: true, pending: true, booked: true }}
+          />
+        ) : (
+          <div className="p-6 text-[var(--text-secondary)]">
+            아직 연결된 트레이너가 없습니다. 관리자에게 문의해 주세요.
+          </div>
+        )}
       </div>
 
       {/* 하단 액션 */}
@@ -298,7 +282,7 @@ export default function ClientReservation() {
         </Button>
       </div>
 
-      {/* 내 예약 상태 리스트 (참고용) */}
+      {/* 내 예약 현황 (간단 리스트) */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold mt-6">내 예약 현황</h2>
         {myReservations.length === 0 ? (
