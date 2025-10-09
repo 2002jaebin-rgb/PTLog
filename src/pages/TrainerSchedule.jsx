@@ -5,6 +5,8 @@ import Button from '../components/ui/Button'
 import ScheduleGrid from '../components/ScheduleGrid'
 import AddSessionModal from '../components/AddSessionModal'
 import DeleteSessionModal from '../components/DeleteSessionModal'
+import SessionInfoModal from '../components/SessionInfoModal'
+import PendingList from '../components/PendingList'
 
 // 유틸
 const hm = (t) => (t || '').slice(0, 5)
@@ -67,7 +69,6 @@ export default function TrainerSchedule() {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      // 트레이너 인증이 auth_user_id인 경우, trainerId로 그대로 사용
       setTrainerId(user.id)
       await fetchWeek(user.id)
     }
@@ -121,9 +122,7 @@ export default function TrainerSchedule() {
           .in('id', memberIds)
         if (!mErr && members) {
           const map = {}
-          members.forEach((m) => {
-            map[m.id] = m
-          })
+          members.forEach((m) => { map[m.id] = m })
           memMap = map
         }
       }
@@ -167,10 +166,7 @@ export default function TrainerSchedule() {
       .update({ status: 'approved' })
       .eq('reservation_id', reservationId)
       .eq('status', 'pending')
-    if (rErr) {
-      alert('예약 승인 실패(1): ' + rErr.message)
-      return
-    }
+    if (rErr) { alert('예약 승인 실패(1): ' + rErr.message); return }
 
     // 2) 세션 available → booked
     const { error: sErr } = await supabase
@@ -178,10 +174,7 @@ export default function TrainerSchedule() {
       .update({ status: 'booked' })
       .eq('session_id', sessionId)
       .eq('status', 'available')
-    if (sErr) {
-      alert('예약 승인 실패(2): ' + sErr.message)
-      return
-    }
+    if (sErr) { alert('예약 승인 실패(2): ' + sErr.message); return }
 
     // 3) 같은 세션의 나머지 pending → rejected
     const { error: r2Err } = await supabase
@@ -192,7 +185,6 @@ export default function TrainerSchedule() {
     if (r2Err) console.warn('다른 예약 거절 실패:', r2Err.message)
 
     await fetchWeek(trainerId)
-    // 모달 재동기화
     if (inspectedSession && inspectedSession.session_id === sessionId) {
       const refreshed = (existingSessions || []).find((s) => s.session_id === sessionId)
       setInspectedSession(refreshed || null)
@@ -205,10 +197,7 @@ export default function TrainerSchedule() {
       .update({ status: 'rejected' })
       .eq('reservation_id', reservationId)
       .eq('status', 'pending')
-    if (error) {
-      alert('예약 거절 실패: ' + error.message)
-      return
-    }
+    if (error) { alert('예약 거절 실패: ' + error.message); return }
     await fetchWeek(trainerId)
   }
 
@@ -222,7 +211,6 @@ export default function TrainerSchedule() {
     return map
   }, [pendingReservations])
 
-  // UI
   if (!trainerId) return <div className="p-6">불러오는 중…</div>
 
   return (
@@ -230,47 +218,25 @@ export default function TrainerSchedule() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">트레이너 스케줄</h1>
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() =>
-              setMonday((prev) => {
-                const d = new Date(prev)
-                d.setDate(prev.getDate() - 7)
-                return getMonday(d)
-              })
-            }
-          >
-            ◀ 지난 주
-          </Button>
-          <span className="text-sm text-[var(--text-secondary)]">
-            {days[0]?.date} ~ {days[6]?.date}
-          </span>
-          <Button
-            onClick={() =>
-              setMonday((prev) => {
-                const d = new Date(prev)
-                d.setDate(prev.getDate() + 7)
-                return getMonday(d)
-              })
-            }
-          >
-            다음 주 ▶
-          </Button>
+          <Button onClick={() => setMonday(prev => { const d = new Date(prev); d.setDate(prev.getDate()-7); return getMonday(d) })}>◀ 지난 주</Button>
+          <span className="text-sm text-[var(--text-secondary)]">{days[0]?.date} ~ {days[6]?.date}</span>
+          <Button onClick={() => setMonday(prev => { const d = new Date(prev); d.setDate(prev.getDate()+7); return getMonday(d) })}>다음 주 ▶</Button>
         </div>
       </div>
 
       <div className="flex justify-end">
         <Button onClick={() => setShowAddModal(true)}>+ 수업 시간 추가</Button>
-        <Button onClick={() => setShowDeleteModal(true)} className="ml-2 bg-red-600 hover:bg-red-700"> 🗑 수업 시간 삭제</Button>
+        <Button onClick={() => setShowDeleteModal(true)} className="ml-2 bg-red-600 hover:bg-red-700">🗑 수업 시간 삭제</Button>
       </div>
 
       <Card className="p-4">
         <ScheduleGrid
           days={days}
           sessions={existingSessions}
-          reservations={pendingReservations} // 노랑(pending)
-          selectedSlots={{}} // 생성은 모달에서, 여기서는 선택 하이라이트 불필요
+          reservations={pendingReservations}
+          selectedSlots={{}}
           selectable={true}
-          onToggleSlot={onCellClick} // ← 클릭 시 세션 상세 모달
+          onToggleSlot={onCellClick}
           startHour={startHour}
           endHour={endHour}
           allowSelectingExisting={true}
@@ -279,68 +245,17 @@ export default function TrainerSchedule() {
         />
       </Card>
 
-      {/* 아래: pending 전용 리스트(빠른 수락/거절) */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">대기 중인 예약</h2>
-        {Object.keys(pendingBySession).length === 0 ? (
-          <Card className="p-3 text-[var(--text-secondary)]">대기 중인 예약이 없습니다.</Card>
-        ) : (
-          Object.entries(pendingBySession).map(([sessionId, rs]) => {
-            const s = existingSessions.find((x) => String(x.session_id) === String(sessionId))
-            if (!s) return null
-            return (
-              <Card key={sessionId} className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-white font-medium">
-                    {s.date} {hm(s.start_time)}–{hm(s.end_time)}{' '}
-                    <span className="ml-2 text-xs text-[var(--text-secondary)]">({s.status})</span>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setInspectedSession(s)
-                      setShowInfoModal(true)
-                    }}
-                  >
-                    상세 보기
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {rs.map((r) => {
-                    const m = membersMap[r.member_id]
-                    return (
-                      <div
-                        key={r.reservation_id}
-                        className="flex items-center justify-between gap-3 border border-white/10 rounded px-3 py-2"
-                      >
-                        <div className="text-sm">
-                          <div className="font-medium">
-                            {m?.name || '알 수 없음'}{' '}
-                            <span className="text-[var(--text-secondary)]">({m?.email || r.member_id})</span>
-                          </div>
-                          <div className="text-[var(--text-secondary)]">
-                            요청시간: {new Date(r.reservation_time).toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" onClick={() => acceptReservation(r.reservation_id, s.session_id)}>
-                            수락
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => rejectReservation(r.reservation_id)}>
-                            거절
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </Card>
-            )
-          })
-        )}
-      </section>
+      {/* 대기 중 예약 리스트 */}
+      <PendingList
+        pendingBySession={pendingBySession}
+        sessions={existingSessions}
+        membersMap={membersMap}
+        onAccept={acceptReservation}
+        onReject={rejectReservation}
+        onOpenSession={(s) => { setInspectedSession(s); setShowInfoModal(true) }}
+      />
 
-      {/* 수업 시간 추가 모달 */}
+      {/* 모달들 */}
       {showAddModal && (
         <AddSessionModal
           trainerId={trainerId}
@@ -359,7 +274,6 @@ export default function TrainerSchedule() {
         />
       )}
 
-      {/* 세션 정보 모달 */}
       {showInfoModal && inspectedSession && (
         <SessionInfoModal
           session={inspectedSession}
@@ -370,99 +284,6 @@ export default function TrainerSchedule() {
           onReject={(reservationId) => rejectReservation(reservationId)}
         />
       )}
-    </div>
-  )
-}
-
-/** 세션 상세 모달: pending이면 수락/거절, booked/available이면 정보만 */
-function SessionInfoModal({ session, reservations, membersMap, onClose, onAccept, onReject }) {
-  const isBooked = session.status === 'booked'
-  const pendings = reservations.filter((r) => r.status === 'pending')
-  const approved = reservations.find((r) => r.status === 'approved')
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-2xl bg-[#0b1220] text-white shadow-xl border border-white/10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-5 border-b border-white/10">
-          <h3 className="text-lg font-semibold">세션 정보</h3>
-        </div>
-        <div className="p-5 space-y-3">
-          <Row label="날짜" value={session.date} />
-          <Row label="시간" value={`${hm(session.start_time)} ~ ${hm(session.end_time)}`} />
-          <Row
-            label="세션 길이"
-            value={session.session_length >= 1 ? `${session.session_length}시간` : `${session.session_length * 60}분`}
-          />
-          <Row
-            label="상태"
-            value={session.status}
-            valueClass={
-              session.status === 'available'
-                ? 'text-blue-300'
-                : session.status === 'booked'
-                ? 'text-green-400'
-                : 'text-yellow-300'
-            }
-          />
-
-          {isBooked && approved && (
-            <div className="mt-2 text-sm">
-              <div className="font-medium mb-1">예약자</div>
-              <div className="text-[var(--text-secondary)]">
-                {membersMap[approved.member_id]?.name || '알 수 없음'} ({membersMap[approved.member_id]?.email || approved.member_id})
-              </div>
-            </div>
-          )}
-
-          {pendings.length > 0 && (
-            <div className="mt-2 space-y-2">
-              <div className="font-medium">대기 중 요청</div>
-              {pendings.map((r) => {
-                const m = membersMap[r.member_id]
-                return (
-                  <div
-                    key={r.reservation_id}
-                    className="flex items-center justify-between gap-3 border border-white/10 rounded px-3 py-2"
-                  >
-                    <div className="text-sm">
-                      <div className="font-medium">
-                        {m?.name || '알 수 없음'}{' '}
-                        <span className="text-[var(--text-secondary)]">({m?.email || r.member_id})</span>
-                      </div>
-                      <div className="text-[var(--text-secondary)]">
-                        요청시간: {new Date(r.reservation_time).toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" onClick={() => onAccept(r.reservation_id)}>수락</Button>
-                      <Button size="sm" variant="secondary" onClick={() => onReject(r.reservation_id)}>거절</Button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {session.status === 'available' && pendings.length === 0 && (
-            <div className="text-sm text-[var(--text-secondary)]">대기 중인 예약이 없습니다.</div>
-          )}
-        </div>
-        <div className="p-4 border-t border-white/10 flex justify-end gap-2">
-          <Button onClick={onClose}>닫기</Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Row({ label, value, valueClass = '' }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-[var(--text-secondary)]">{label}</span>
-      <span className={`text-sm ${valueClass}`}>{value}</span>
     </div>
   )
 }

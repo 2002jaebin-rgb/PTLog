@@ -1,14 +1,13 @@
 import React, { useState } from 'react'
 import { supabase } from '@/supabaseClient'
-import Button from '../components/ui/Button'
-import Card from '../components/ui/Card'
+import Button from './ui/Button'
+import Card from './ui/Card'
 
 export default function DeleteSessionModal({ trainerId, sessions, onClose, onDeleted }) {
   const [selected, setSelected] = useState([])
+
   const toggleSelect = (sid) =>
-    setSelected((prev) =>
-      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]
-    )
+    setSelected((prev) => (prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]))
 
   const handleDelete = async () => {
     if (!selected.length) return alert('삭제할 세션을 선택하세요.')
@@ -19,14 +18,14 @@ export default function DeleteSessionModal({ trainerId, sessions, onClose, onDel
       .delete()
       .in('session_id', selected)
       .eq('trainer_id', trainerId)
-      .eq('status', 'available')
+      .eq('status', 'available') // pending/booked 보호
     if (error) {
       alert('삭제 실패: ' + error.message)
       return
     }
     alert('삭제 완료!')
-    onDeleted()
-    onClose()
+    onDeleted?.()
+    onClose?.()
   }
 
   const available = sessions.filter((s) => s.status === 'available')
@@ -64,17 +63,13 @@ export default function DeleteSessionModal({ trainerId, sessions, onClose, onDel
 
         {locked.length > 0 && (
           <Card className="p-3 bg-[#1a2238] text-xs text-[var(--text-secondary)] mb-3">
-            예약 대기 중 또는 확정된 세션은 삭제할 수 없습니다.
+            예약 대기 중(pending) 또는 확정(booked)된 세션은 삭제할 수 없습니다.
           </Card>
         )}
 
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            닫기
-          </Button>
-          <Button variant="danger" onClick={handleDelete}>
-            선택 삭제
-          </Button>
+          <Button variant="secondary" onClick={onClose}>닫기</Button>
+          <Button variant="danger" onClick={handleDelete}>선택 삭제</Button>
         </div>
       </div>
     </div>
