@@ -1,33 +1,24 @@
 import React from 'react'
+import { NavLink } from 'react-router-dom'
 
 export default function BottomNav({ role }) {
-  const Item = ({ icon, label, disabled }) => (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      className="flex flex-col items-center gap-1 px-2 py-1 text-[11px] leading-none text-[hsl(var(--muted))] hover:text-[hsl(var(--text))] disabled:opacity-60"
-    >
-      <span className="text-lg">{icon}</span>
-      <span>{label}</span>
-    </button>
-  )
+  if (!role) return null
 
   const items =
     role === 'trainer'
       ? [
-          { icon: '📋', label: '대시보드' },
-          { icon: '📅', label: '수업 관리' },
-          { icon: '🧍', label: '회원' },
-          { icon: '📝', label: '수업 로그' },
-          { icon: '⚙️', label: '설정' },
+          { icon: '📋', label: '대시보드', to: '/dashboard' },
+          { icon: '📅', label: '수업 관리', to: '/trainer-schedule' },
+          { icon: '🧍', label: '회원', to: '/member-list' },
+          { icon: '📝', label: '수업 로그', to: '/trainer-log' },
+          { icon: '⚙️', label: '설정', to: '/settings' }
         ]
       : [
-          { icon: '🏠', label: '홈' },
-          { icon: '📈', label: '운동 로그' },
-          { icon: '📝', label: '내 로그' },
-          { icon: '📅', label: '예약' },
-          { icon: '⚙️', label: '설정' },
+          { icon: '🏠', label: '홈', to: '/client' },
+          { icon: '📈', label: '운동 로그', to: '/client-history' },
+          { icon: '📝', label: '내 로그', to: '/client-log' },
+          { icon: '📅', label: '예약', to: '/client-reservation' },
+          { icon: '⚙️', label: '설정', to: '/settings' }
         ]
 
   return (
@@ -45,8 +36,22 @@ export default function BottomNav({ role }) {
       role="navigation"
       aria-label="하단 네비게이션"
     >
-      {items.map((it, idx) => (
-        <Item key={idx} icon={it.icon} label={it.label} disabled />
+      {items.map(({ icon, label, to }) => (
+        <NavLink
+          key={to}
+          to={to}
+          className={({ isActive }) =>
+            [
+              'flex flex-col items-center gap-1 px-2 py-1 text-[11px] leading-none transition-colors',
+              isActive
+                ? 'text-[hsl(var(--text))]'
+                : 'text-[hsl(var(--muted))] hover:text-[hsl(var(--text))]'
+            ].join(' ')
+          }
+        >
+          <span className="text-lg">{icon}</span>
+          <span>{label}</span>
+        </NavLink>
       ))}
     </nav>
   )
