@@ -205,8 +205,8 @@ export default function TrainerLog() {
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">수업 로그</h1>
+    <div className="px-4 py-6 md:py-8 max-w-2xl mx-auto">
+      <h1 className="text-xl font-bold mb-4 md:text-2xl">수업 로그</h1>
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
@@ -257,39 +257,48 @@ export default function TrainerLog() {
           {/* 운동 입력 리스트 */}
           <div className="space-y-3 mb-4">
             {exercises.map((ex, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <input
-                  placeholder="운동명"
-                  value={ex.name}
-                  onChange={(e) => handleExerciseChange(i, 'name', e.target.value)}
-                  className="flex-1 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
-                />
-                <input
-                  placeholder="세트"
-                  value={ex.sets}
-                  onChange={(e) => handleExerciseChange(i, 'sets', e.target.value)}
-                  className="w-20 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
-                />
-                <input
-                  placeholder="횟수"
-                  value={ex.reps}
-                  onChange={(e) => handleExerciseChange(i, 'reps', e.target.value)}
-                  className="w-20 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
-                />
-                <input
-                  placeholder="중량"
-                  value={ex.weight}
-                  onChange={(e) => handleExerciseChange(i, 'weight', e.target.value)}
-                  className="w-24 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeExercise(i)}
-                  className="text-sm px-2 py-2 rounded-lg border border-[var(--border-color)] hover:bg-[var(--card)]"
-                  title="항목 제거"
-                >
-                  삭제
-                </button>
+              <div
+                key={i}
+                className="rounded-2xl border border-[var(--border-color)] bg-[var(--card)]/60 p-3 md:p-4"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
+                  <div className="flex-1 min-w-0">
+                    <input
+                      placeholder="운동명"
+                      value={ex.name}
+                      onChange={(e) => handleExerciseChange(i, 'name', e.target.value)}
+                      className="w-full bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:flex md:items-center md:gap-3">
+                    <input
+                      placeholder="세트"
+                      value={ex.sets}
+                      onChange={(e) => handleExerciseChange(i, 'sets', e.target.value)}
+                      className="w-full md:w-20 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
+                    />
+                    <input
+                      placeholder="횟수"
+                      value={ex.reps}
+                      onChange={(e) => handleExerciseChange(i, 'reps', e.target.value)}
+                      className="w-full md:w-20 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
+                    />
+                    <input
+                      placeholder="중량"
+                      value={ex.weight}
+                      onChange={(e) => handleExerciseChange(i, 'weight', e.target.value)}
+                      className="w-full sm:col-span-2 md:col-span-1 md:w-24 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeExercise(i)}
+                    className="text-sm px-3 py-2 rounded-xl border border-[var(--border-color)] hover:bg-[var(--card)] self-end md:self-center"
+                    title="항목 제거"
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -297,7 +306,7 @@ export default function TrainerLog() {
           <button
             type="button"
             onClick={addExercise}
-            className="mb-4 px-3 py-2 rounded-xl border border-[var(--border-color)] hover:bg-[var(--card)]"
+            className="mb-4 w-full md:w-auto px-3 py-2 rounded-xl border border-[var(--border-color)] hover:bg-[var(--card)]"
           >
             + 운동 추가
           </button>
@@ -312,7 +321,7 @@ export default function TrainerLog() {
           />
 
           {/* 저장/전송 */}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
               onClick={handleSave}
