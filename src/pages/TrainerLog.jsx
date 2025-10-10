@@ -101,9 +101,12 @@ export default function TrainerLog() {
               const memberEmail = member?.email || ''
               const label = `${session.date} ${startLabel}${endLabel ? ` ~ ${endLabel}` : ''} · ${memberName}`
 
+              const sessionIdStr = String(session.session_id)
+              const memberIdStr = reservation.member_id ? String(reservation.member_id) : ''
+
               return {
-                session_id: session.session_id,
-                member_id: reservation.member_id,
+                session_id: sessionIdStr,
+                member_id: memberIdStr,
                 label,
                 startLabel,
                 endLabel,
