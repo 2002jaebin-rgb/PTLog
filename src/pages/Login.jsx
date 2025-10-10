@@ -21,7 +21,7 @@ export default function Login() {
       .from('trainers')
       .select('id')
       .eq('id', data.user.id)
-      .single()
+      .maybeSingle()
 
     if (trainer) navigate('/dashboard')
     else navigate('/client')

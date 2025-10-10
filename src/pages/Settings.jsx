@@ -8,7 +8,7 @@ export default function Settings() {
   useEffect(() => {
     const fetchTrainer = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data } = await supabase.from('trainers').select('name, email').eq('id', user.id).single()
+      const { data } = await supabase.from('trainers').select('name, email').eq('id', user.id).maybeSingle()
       setTrainer(data)
     }
     fetchTrainer()

@@ -26,7 +26,7 @@ export default function Header({ user }) {
           .from('trainers')
           .select('id,name,auth_user_id')
           .eq('auth_user_id', user.id)
-          .single()
+          .maybeSingle()
 
         if (cancelled) return
         if (trainer) {
@@ -39,7 +39,7 @@ export default function Header({ user }) {
           .from('members')
           .select('id,name,auth_user_id')
           .eq('auth_user_id', user.id)
-          .single()
+          .maybeSingle()
 
         if (cancelled) return
         if (member) {
