@@ -13,7 +13,7 @@ export default function ClientPage() {
         .from('members')
         .select('id')
         .eq('auth_user_id', user.id)
-        .single()
+        .maybeSingle()
 
       if (memberError || !member) {
         console.error('회원 정보 없음:', memberError)
