@@ -66,15 +66,71 @@ export default function TrainerLog() {
         if (bookedSessions && bookedSessions.length > 0) {
           const sessionIds = bookedSessions.map((s) => s.session_id)
 
-          const { data: approvedReservations, error: rErr } = await supabase
-            .from('reservations')
-            .select('session_id, member_id, status')
-            .in('session_id', sessionIds)
-            .eq('status', 'approved')
+          let reservationsBySession = {}
+          let acceptedSessionIds = new Set()
 
-          if (rErr) throw rErr
+          if (sessionIds.length > 0) {
+            const { data: reservationRows, error: rErr } = await supabase
+              .from('reservations')
+              .select('session_id, member_id, status')
+              .in('session_id', sessionIds)
 
-          const memberIds = [...new Set((approvedReservations || []).map((r) => r.member_id).filter(Boolean))]
+            if (rErr) throw rErr
+
+            reservationsBySession = (reservationRows || []).reduce((acc, cur) => {
+              const key = String(cur.session_id)
+              if (!acc[key]) acc[key] = []
+              acc[key].push(cur)
+              return acc
+            }, {})
+
+            const { data: acceptedRequests, error: reqErr } = await supabase
+              .from('session_requests')
+              .select('session_id, status')
+              .in('session_id', sessionIds)
+              .eq('status', 'accepted')
+
+            if (reqErr) throw reqErr
+
+            acceptedSessionIds = new Set((acceptedRequests || []).map((req) => String(req.session_id)))
+          }
+
+          const pickReservation = (list = []) => {
+            if (!list.length) return null
+            const priority = { approved: 0, pending: 1 }
+            const sorted = [...list].sort((a, b) => {
+              const aP = priority[a.status] ?? 99
+              const bP = priority[b.status] ?? 99
+              if (aP !== bP) return aP - bP
+              return 0
+            })
+            return sorted[0]
+          }
+
+          const candidates = bookedSessions
+            .map((session) => {
+              const sessionKey = String(session.session_id)
+              const reservation = pickReservation(reservationsBySession[sessionKey])
+              if (!reservation) return null
+
+              // 요청이 승인되어 예약 상태가 approved가 되었다면 다시 선택할 수 없게 제외
+              if (reservation.status === 'approved' && acceptedSessionIds.has(sessionKey)) {
+                return null
+              }
+
+              const memberIdValue = reservation.member_id
+              if (!memberIdValue) return null
+
+              return {
+                session,
+                reservation,
+                sessionKey,
+                memberId: reservation.member_id,
+              }
+            })
+            .filter(Boolean)
+
+          const memberIds = [...new Set(candidates.map((item) => item.memberId).filter(Boolean))]
           let membersMap = {}
 
           if (memberIds.length > 0) {
@@ -91,11 +147,8 @@ export default function TrainerLog() {
           }
 
           const now = new Date()
-          normalizedSessions = (bookedSessions || [])
-            .map((session) => {
-              const reservation = (approvedReservations || []).find((r) => r.session_id === session.session_id)
-              if (!reservation) return null
-
+          normalizedSessions = candidates
+            .map(({ session, reservation }) => {
               const referenceTime = toLocalDateTime(session.date, session.end_time || session.start_time)
               if (!referenceTime) return null
               if (referenceTime > now) return null

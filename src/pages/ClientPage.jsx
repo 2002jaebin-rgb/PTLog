@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/supabaseClient'
 
+const coerceNumericId = (value) => {
+  if (value === null || value === undefined || value === '') return value
+  const numeric = Number(value)
+  return Number.isNaN(numeric) ? value : numeric
+}
+
 export default function ClientPage() {
   const [requests, setRequests] = useState([])
 
@@ -59,7 +65,13 @@ export default function ClientPage() {
       }
 
       const sessionMap = (sessions || []).reduce((acc, cur) => {
-        acc[String(cur.session_id)] = cur
+        const startLabel = cur.start_time ? cur.start_time.slice(0, 5) : ''
+        const endLabel = cur.end_time ? cur.end_time.slice(0, 5) : ''
+        acc[String(cur.session_id)] = {
+          ...cur,
+          startLabel,
+          endLabel,
+        }
         return acc
       }, {})
 
@@ -72,37 +84,35 @@ export default function ClientPage() {
     fetchRequests()
   }, [])
 
-  const formatFallbackDate = (isoString) => {
-    if (!isoString) return ''
-    const date = new Date(isoString)
-    if (Number.isNaN(date.getTime())) return ''
-    const y = date.getFullYear()
-    const m = String(date.getMonth() + 1).padStart(2, '0')
-    const d = String(date.getDate()).padStart(2, '0')
-    const hh = String(date.getHours()).padStart(2, '0')
-    const mm = String(date.getMinutes()).padStart(2, '0')
-    return `${y}-${m}-${d} ${hh}:${mm}`
-  }
+  const handleAccept = async (request) => {
+    const { id, session_id, member_id } = request
 
-  const formatSessionTiming = (req) => {
-    const info = req.sessionInfo
-    if (info?.date) {
-      const start = info.start_time ? info.start_time.slice(0, 5) : ''
-      const end = info.end_time ? info.end_time.slice(0, 5) : ''
-      if (start && end) return `${info.date} ${start} ~ ${end}`
-      if (start) return `${info.date} ${start}`
-      return info.date
+    const updates = []
+    updates.push(
+      supabase
+        .from('session_requests')
+        .update({ status: 'accepted' })
+        .eq('id', id)
+    )
+
+    if (session_id && member_id) {
+      const coercedSessionId = coerceNumericId(session_id)
+      const coercedMemberId = coerceNumericId(member_id)
+      updates.push(
+        supabase
+          .from('reservations')
+          .update({ status: 'approved' })
+          .eq('session_id', coercedSessionId)
+          .eq('member_id', coercedMemberId)
+      )
     }
 
-    return formatFallbackDate(req.created_at)
-  }
+    const results = await Promise.all(updates)
+    results.forEach(({ error }) => {
+      if (error) console.error('요청 처리 중 오류:', error)
+    })
 
-  const handleAccept = async (id) => {
-    await supabase
-      .from('session_requests')
-      .update({ status: 'accepted' })
-      .eq('id', id)
-    setRequests(requests.filter((r) => r.id !== id))
+    setRequests((prev) => prev.filter((r) => r.id !== id))
   }
 
   if (!requests.length) return <p className="p-6">대기중인 요청이 없습니다.</p>
@@ -113,9 +123,19 @@ export default function ClientPage() {
       {requests.map((req) => (
         <div key={req.id} className="border p-4 mb-4 rounded">
           <p className="font-semibold mb-2">{req.notes}</p>
-          <p className="text-sm text-[var(--text-secondary)] mb-2">
-            진행일시: {formatSessionTiming(req)}
-          </p>
+          <div className="text-sm text-[var(--text-secondary)] mb-2">
+            {req.sessionInfo ? (
+              <div className="space-y-0.5">
+                <div>진행 날짜: {req.sessionInfo.date}</div>
+                <div>
+                  진행 시간: {req.sessionInfo.startLabel}
+                  {req.sessionInfo.endLabel ? ` ~ ${req.sessionInfo.endLabel}` : ''}
+                </div>
+              </div>
+            ) : (
+              <div>세션 일정 정보를 불러올 수 없습니다.</div>
+            )}
+          </div>
           <ul className="mb-2">
             {req.exercises?.map((ex, i) => (
               <li key={i}>
@@ -124,7 +144,7 @@ export default function ClientPage() {
             ))}
           </ul>
           <button
-            onClick={() => handleAccept(req.id)}
+            onClick={() => handleAccept(req)}
             className="bg-green-500 text-white px-4 py-2 rounded"
           >
             승인 및 회차 차감
