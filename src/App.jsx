@@ -66,7 +66,9 @@ export default function App() {
           {/* 전역 user 상태를 Header에 전달 */}
           <Header user={user} />
 
-          <main className="p-4 max-w-3xl mx-auto">
+          <main
+            className="p-4 pb-[calc(96px+env(safe-area-inset-bottom))] md:pb-10 max-w-3xl mx-auto"
+          >
             <Routes>
               {/* ✅ 항상 유효한 엘리먼트를 반환하도록 래퍼 사용 */}
               <Route path="/login" element={<LoginRoute user={user} />} />
