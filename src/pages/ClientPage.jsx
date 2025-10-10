@@ -29,8 +29,39 @@ export default function ClientPage() {
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
 
-      if (error) console.error(error)
-      setRequests(reqs || [])
+      if (error) {
+        console.error(error)
+        setRequests([])
+        return
+      }
+
+      const sessionIds = [...new Set((reqs || [])
+        .map((req) => req.session_id)
+        .filter(Boolean))]
+
+      let sessionMap = {}
+      if (sessionIds.length) {
+        const { data: sessions, error: sessionsError } = await supabase
+          .from('sessions')
+          .select('session_id, date, start_time, end_time')
+          .in('session_id', sessionIds)
+
+        if (sessionsError) {
+          console.error(sessionsError)
+        } else {
+          sessionMap = (sessions || []).reduce((acc, cur) => {
+            acc[cur.session_id] = cur
+            return acc
+          }, {})
+        }
+      }
+
+      const enriched = (reqs || []).map((req) => ({
+        ...req,
+        session: req.session_id ? sessionMap[req.session_id] : null,
+      }))
+
+      setRequests(enriched)
     }
 
     fetchRequests()
@@ -52,6 +83,13 @@ export default function ClientPage() {
       {requests.map((req) => (
         <div key={req.id} className="border p-4 mb-4 rounded">
           <p className="font-semibold mb-2">{req.notes}</p>
+          {req.session && (
+            <div className="text-sm text-[var(--text-secondary)] mb-2">
+              {req.session.date}{' '}
+              {req.session.start_time?.slice(0, 5)}
+              {req.session.end_time ? ` ~ ${req.session.end_time.slice(0, 5)}` : ''}
+            </div>
+          )}
           <ul className="mb-2">
             {req.exercises?.map((ex, i) => (
               <li key={i}>
