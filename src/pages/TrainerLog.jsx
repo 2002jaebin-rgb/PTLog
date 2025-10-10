@@ -62,9 +62,9 @@ export default function TrainerLog() {
 
           const { data: approvedReservations, error: rErr } = await supabase
             .from('reservations')
-            .select('session_id, member_id, status')
+            .select('session_id, member_id, status, reservation_time')
             .in('session_id', sessionIds)
-            .eq('status', 'approved')
+            .in('status', ['approved', 'completed'])
 
           if (rErr) throw rErr
 
@@ -152,7 +152,6 @@ export default function TrainerLog() {
   const validate = () => {
     if (!me) return '로그인이 필요합니다.'
     if (!sessionId) return '세션을 선택해주세요.'
-    if (!memberId) return '선택된 세션의 회원 정보를 찾을 수 없습니다.'
     // 최소 하나라도 이름이 채워진 운동이 있는지
     const hasContent = exercises.some(ex => ex.name?.trim())
     if (!hasContent) return '최소 1개 이상의 운동을 입력해주세요.'
@@ -168,10 +167,34 @@ export default function TrainerLog() {
     setError('')
     setSaving(true)
     try {
+      let targetMemberId = memberId
+
+      if (!targetMemberId) {
+        const { data: fallbackReservations, error: fallbackErr } = await supabase
+          .from('reservations')
+          .select('member_id, reservation_time')
+          .eq('session_id', sessionId)
+          .in('status', ['approved', 'completed'])
+          .order('reservation_time', { ascending: false })
+          .limit(1)
+
+        if (fallbackErr) throw fallbackErr
+
+        targetMemberId = fallbackReservations?.[0]?.member_id || ''
+        if (targetMemberId) {
+          setMemberId(targetMemberId)
+        }
+      }
+
+      if (!targetMemberId) {
+        setError('선택된 세션의 회원 정보를 찾을 수 없습니다.')
+        return
+      }
+
       // session_requests에 pending으로 기록
       const payload = {
         trainer_id: me.id,          // 트레이너 auth.users.id
-        member_id: memberId,        // 선택된 회원 PTLog id (members.id)
+        member_id: targetMemberId,  // 선택된 회원 PTLog id (members.id)
         notes: note || null,
         exercises,                  // JSON으로 저장
         status: 'pending',
