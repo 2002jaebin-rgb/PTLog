@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/supabaseClient'
+import { formatTimeLabel, matchSessionsToRequests, toLocalDateTime } from '@/utils/sessionUtils'
 
 const coerceNumericId = (value) => {
   if (value === null || value === undefined || value === '') return value
@@ -9,6 +10,7 @@ const coerceNumericId = (value) => {
 
 export default function ClientPage() {
   const [requests, setRequests] = useState([])
+  const [memberInfo, setMemberInfo] = useState(null)
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -17,7 +19,7 @@ export default function ClientPage() {
       // 먼저 회원의 member_id를 가져오기
       const { data: member, error: memberError } = await supabase
         .from('members')
-        .select('id')
+        .select('id, trainer_id')
         .eq('auth_user_id', user.id)
         .single()
 
@@ -27,13 +29,15 @@ export default function ClientPage() {
         return
       }
 
+      setMemberInfo(member)
+
       // 이제 session_requests 조회
-      const { data: reqs, error } = await supabase
+      const { data: reqRows, error } = await supabase
         .from('session_requests')
         .select('*')
         .eq('member_id', member.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
+        .in('status', ['pending', 'accepted'])
+        .order('created_at', { ascending: true })
 
       if (error) {
         console.error(error)
@@ -41,43 +45,68 @@ export default function ClientPage() {
         return
       }
 
-      const requestsWithSessionInfo = await enrichRequestsWithSessionTimes(reqs || [])
-      setRequests(requestsWithSessionInfo)
+      const pendingRequests = (reqRows || []).filter((req) => req.status === 'pending')
+      if (!pendingRequests.length) {
+        setRequests([])
+        return
+      }
+
+      const requestsWithSessionInfo = await enrichRequestsWithSessionTimes(member, reqRows || [])
+      setRequests(requestsWithSessionInfo.filter((req) => req.status === 'pending'))
     }
 
-    const enrichRequestsWithSessionTimes = async (list) => {
-      const sessionIds = [...new Set(list.map((req) => req.session_id).filter(Boolean))]
-      if (!sessionIds.length) return list
+    const enrichRequestsWithSessionTimes = async (member, allRequests) => {
+      const pending = allRequests.filter((req) => req.status === 'pending')
+      if (!pending.length) return allRequests
 
-      const queryIds = sessionIds.map((id) => {
-        const numeric = Number(id)
-        return Number.isNaN(numeric) ? id : numeric
-      })
+      const { data: reservations, error: reservationError } = await supabase
+        .from('reservations')
+        .select('session_id, status')
+        .eq('member_id', member.id)
+
+      if (reservationError) {
+        console.error(reservationError)
+        return allRequests
+      }
+
+      const sessionIds = [...new Set((reservations || []).map((r) => r.session_id).filter((id) => id !== null && id !== undefined))]
+      if (!sessionIds.length) return allRequests
 
       const { data: sessions, error: sessionError } = await supabase
         .from('sessions')
-        .select('session_id, date, start_time, end_time')
-        .in('session_id', queryIds)
+        .select('session_id, date, start_time, end_time, status, trainer_id')
+        .in('session_id', sessionIds)
 
       if (sessionError) {
         console.error(sessionError)
-        return list
+        return allRequests
       }
 
-      const sessionMap = (sessions || []).reduce((acc, cur) => {
-        const startLabel = cur.start_time ? cur.start_time.slice(0, 5) : ''
-        const endLabel = cur.end_time ? cur.end_time.slice(0, 5) : ''
-        acc[String(cur.session_id)] = {
-          ...cur,
-          startLabel,
-          endLabel,
-        }
-        return acc
-      }, {})
+      const now = new Date()
+      const sessionEntries = (sessions || [])
+        .filter((session) => session.trainer_id === member.trainer_id && session.status === 'booked')
+        .map((session) => {
+          const reference = toLocalDateTime(session.date, session.end_time || session.start_time)
+          if (!reference) return null
+          if (reference > now) return null
 
-      return list.map((req) => ({
+          return {
+            sessionKey: String(session.session_id),
+            session_id: session.session_id,
+            member_id: String(member.id),
+            date: session.date,
+            startLabel: formatTimeLabel(session.start_time),
+            endLabel: session.end_time ? formatTimeLabel(session.end_time) : '',
+            referenceTime: reference.getTime(),
+          }
+        })
+        .filter(Boolean)
+
+      const { requestSessionMap } = matchSessionsToRequests(sessionEntries, allRequests)
+
+      return allRequests.map((req) => ({
         ...req,
-        sessionInfo: sessionMap[String(req.session_id)] || null,
+        sessionInfo: requestSessionMap[req.id] || null,
       }))
     }
 
@@ -85,25 +114,24 @@ export default function ClientPage() {
   }, [])
 
   const handleAccept = async (request) => {
-    const { id, session_id, member_id } = request
+    const { id, sessionInfo } = request
 
-    const updates = []
-    updates.push(
+    const updates = [
       supabase
         .from('session_requests')
         .update({ status: 'accepted' })
-        .eq('id', id)
-    )
+        .eq('id', id),
+    ]
 
-    if (session_id && member_id) {
-      const coercedSessionId = coerceNumericId(session_id)
-      const coercedMemberId = coerceNumericId(member_id)
+    if (sessionInfo?.session_id && memberInfo?.id) {
+      const coercedSessionId = coerceNumericId(sessionInfo.session_id)
+      const coercedMemberId = coerceNumericId(memberInfo.id)
       updates.push(
         supabase
           .from('reservations')
           .update({ status: 'approved' })
           .eq('session_id', coercedSessionId)
-          .eq('member_id', coercedMemberId)
+          .eq('member_id', coercedMemberId),
       )
     }
 

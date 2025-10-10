@@ -1,12 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '@/supabaseClient'
-
-const toLocalDateTime = (dateStr, timeStr) => {
-  if (!dateStr || !timeStr) return null
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const [hour, minute] = timeStr.slice(0, 5).split(':').map(Number)
-  return new Date(year, month - 1, day, hour, minute, 0, 0)
-}
+import { formatTimeLabel, matchSessionsToRequests, toLocalDateTime } from '@/utils/sessionUtils'
 
 const toTodayString = () => {
   const now = new Date()
@@ -14,14 +8,6 @@ const toTodayString = () => {
   const m = String(now.getMonth() + 1).padStart(2, '0')
   const d = String(now.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
-}
-
-const formatTime = (timeStr) => (timeStr ? timeStr.slice(0, 5) : '')
-
-const coerceSessionId = (value) => {
-  if (value === null || value === undefined || value === '') return null
-  const numeric = Number(value)
-  return Number.isNaN(numeric) ? value : numeric
 }
 
 export default function TrainerLog() {
@@ -62,12 +48,13 @@ export default function TrainerLog() {
 
         if (sErr) throw sErr
 
-        let normalizedSessions = []
+        let sessionEntries = []
+        const sessionsByMember = {}
+
         if (bookedSessions && bookedSessions.length > 0) {
           const sessionIds = bookedSessions.map((s) => s.session_id)
 
           let reservationsBySession = {}
-          let acceptedSessionIds = new Set()
 
           if (sessionIds.length > 0) {
             const { data: reservationRows, error: rErr } = await supabase
@@ -83,16 +70,6 @@ export default function TrainerLog() {
               acc[key].push(cur)
               return acc
             }, {})
-
-            const { data: acceptedRequests, error: reqErr } = await supabase
-              .from('session_requests')
-              .select('session_id, status')
-              .in('session_id', sessionIds)
-              .eq('status', 'accepted')
-
-            if (reqErr) throw reqErr
-
-            acceptedSessionIds = new Set((acceptedRequests || []).map((req) => String(req.session_id)))
           }
 
           const pickReservation = (list = []) => {
@@ -112,11 +89,6 @@ export default function TrainerLog() {
               const sessionKey = String(session.session_id)
               const reservation = pickReservation(reservationsBySession[sessionKey])
               if (!reservation) return null
-
-              // 요청이 승인되어 예약 상태가 approved가 되었다면 다시 선택할 수 없게 제외
-              if (reservation.status === 'approved' && acceptedSessionIds.has(sessionKey)) {
-                return null
-              }
 
               const memberIdValue = reservation.member_id
               if (!memberIdValue) return null
@@ -147,15 +119,15 @@ export default function TrainerLog() {
           }
 
           const now = new Date()
-          normalizedSessions = candidates
-            .map(({ session, reservation }) => {
-              const referenceTime = toLocalDateTime(session.date, session.end_time || session.start_time)
-              if (!referenceTime) return null
-              if (referenceTime > now) return null
+          sessionEntries = candidates
+            .map(({ session, reservation, sessionKey }) => {
+              const reference = toLocalDateTime(session.date, session.end_time || session.start_time)
+              if (!reference) return null
+              if (reference > now) return null
 
               const member = membersMap[reservation.member_id]
-              const startLabel = formatTime(session.start_time)
-              const endLabel = session.end_time ? formatTime(session.end_time) : ''
+              const startLabel = formatTimeLabel(session.start_time)
+              const endLabel = session.end_time ? formatTimeLabel(session.end_time) : ''
               const memberName = member?.name || `회원 ${reservation.member_id}`
               const memberEmail = member?.email || ''
               const label = `${session.date} ${startLabel}${endLabel ? ` ~ ${endLabel}` : ''} · ${memberName}`
@@ -163,7 +135,8 @@ export default function TrainerLog() {
               const sessionIdStr = String(session.session_id)
               const memberIdStr = reservation.member_id ? String(reservation.member_id) : ''
 
-              return {
+              const entry = {
+                sessionKey,
                 session_id: sessionIdStr,
                 member_id: memberIdStr,
                 label,
@@ -174,15 +147,60 @@ export default function TrainerLog() {
                 memberName,
                 memberEmail,
                 date: session.date,
-                referenceTime: referenceTime.getTime(),
+                referenceTime: reference.getTime(),
               }
+
+              if (memberIdStr) {
+                if (!sessionsByMember[memberIdStr]) sessionsByMember[memberIdStr] = []
+                sessionsByMember[memberIdStr].push(entry)
+              }
+
+              return entry
             })
             .filter(Boolean)
-            .sort((a, b) => b.referenceTime - a.referenceTime)
         }
 
-        setSessionOptions(normalizedSessions)
-        setSessionId((prev) => (normalizedSessions.some((opt) => opt.session_id === prev) ? prev : ''))
+        const memberKeys = Object.keys(sessionsByMember)
+        let requestRows = []
+
+        if (memberKeys.length > 0) {
+          const queryMemberIds = memberKeys.map((id) => {
+            const numeric = Number(id)
+            return Number.isNaN(numeric) ? id : numeric
+          })
+
+          const { data: fetchedRequests, error: reqErr } = await supabase
+            .from('session_requests')
+            .select('id, member_id, status, created_at')
+            .eq('trainer_id', user.id)
+            .in('member_id', queryMemberIds)
+            .in('status', ['pending', 'accepted'])
+
+          if (reqErr) throw reqErr
+          requestRows = fetchedRequests || []
+        }
+
+        const requestsByMember = requestRows.reduce((acc, cur) => {
+          const key = String(cur.member_id)
+          if (!acc[key]) acc[key] = []
+          acc[key].push(cur)
+          return acc
+        }, {})
+
+        const consumedKeys = new Set()
+        memberKeys.forEach((memberIdKey) => {
+          const entries = sessionsByMember[memberIdKey] || []
+          const relatedRequests = requestsByMember[memberIdKey] || []
+          const { consumedSessionKeys } = matchSessionsToRequests(entries, relatedRequests)
+          consumedSessionKeys.forEach((key) => consumedKeys.add(key))
+        })
+
+        const availableSessions = sessionEntries
+          .filter((entry) => !consumedKeys.has(entry.sessionKey))
+          .sort((a, b) => b.referenceTime - a.referenceTime)
+
+        setSessionOptions(availableSessions)
+        setSessionId((prev) => (availableSessions.some((opt) => opt.session_id === prev) ? prev : ''))
       } catch (e) {
         console.error('[TrainerLog] init error:', e?.message || e)
         setError('초기 데이터를 불러오는 중 문제가 발생했습니다.')
@@ -232,8 +250,6 @@ export default function TrainerLog() {
     setError('')
     setSaving(true)
     try {
-      const sessionIdValue = coerceSessionId(sessionId)
-
       // session_requests에 pending으로 기록
       const payload = {
         trainer_id: me.id,          // 트레이너 auth.users.id
@@ -241,7 +257,6 @@ export default function TrainerLog() {
         notes: note || null,
         exercises,                  // JSON으로 저장
         status: 'pending',
-        session_id: sessionIdValue,
       }
       const { error: insErr } = await supabase
         .from('session_requests')
