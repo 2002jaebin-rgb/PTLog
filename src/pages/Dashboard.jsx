@@ -21,7 +21,12 @@ export default function Dashboard() {
   }, [])
 
   const fetchMembers = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { session }
+    } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) return
+
     const { data, error } = await supabase
       .from('members')
       .select('id, name, sessions_total, sessions_used')
@@ -33,17 +38,27 @@ export default function Dashboard() {
   const handleAddMember = async (e) => {
     e.preventDefault()
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { session },
+      error: sessionError
+    } = await supabase.auth.getSession()
+
+    if (sessionError || !session?.user || !session?.access_token) {
+      setLoading(false)
+      alert('로그인 정보를 확인할 수 없습니다.')
+      return
+    }
 
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-member`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          trainer_id: user.id,
+          trainer_id: session.user.id,
           name: newMember.name,
           email: newMember.email,
           sessions_total: parseInt(newMember.sessions_total, 10),

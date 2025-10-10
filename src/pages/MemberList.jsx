@@ -95,19 +95,24 @@ export default function MemberList() {
     setSubmitting(true)
 
     try {
-      const { data: auth, error: authError } = await supabase.auth.getUser()
-      if (authError || !auth?.user) {
-        throw authError || new Error('로그인 정보를 확인할 수 없습니다.')
+      const {
+        data: { session },
+        error: sessionError
+      } = await supabase.auth.getSession()
+
+      if (sessionError || !session?.user || !session?.access_token) {
+        throw sessionError || new Error('로그인 정보를 확인할 수 없습니다.')
       }
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-member`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          trainer_id: auth.user.id,
+          trainer_id: session.user.id,
           name: trimmedName,
           email: trimmedEmail,
           sessions_total: totalSessions,
