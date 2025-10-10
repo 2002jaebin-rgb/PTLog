@@ -50,6 +50,7 @@ export default function TrainerLog() {
 
         let sessionEntries = []
         const sessionsByMember = {}
+        const approvedSessionKeys = new Set()
 
         if (bookedSessions && bookedSessions.length > 0) {
           const sessionIds = bookedSessions.map((s) => s.session_id)
@@ -92,6 +93,10 @@ export default function TrainerLog() {
 
               const memberIdValue = reservation.member_id
               if (!memberIdValue) return null
+
+              if (reservation.status === 'approved') {
+                approvedSessionKeys.add(sessionKey)
+              }
 
               return {
                 session,
@@ -148,6 +153,7 @@ export default function TrainerLog() {
                 memberEmail,
                 date: session.date,
                 referenceTime: reference.getTime(),
+                reservationStatus: reservation.status || '',
               }
 
               if (memberIdStr) {
@@ -187,7 +193,7 @@ export default function TrainerLog() {
           return acc
         }, {})
 
-        const consumedKeys = new Set()
+        const consumedKeys = new Set(approvedSessionKeys)
         memberKeys.forEach((memberIdKey) => {
           const entries = sessionsByMember[memberIdKey] || []
           const relatedRequests = requestsByMember[memberIdKey] || []
