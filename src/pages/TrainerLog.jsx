@@ -257,35 +257,39 @@ export default function TrainerLog() {
           {/* 운동 입력 리스트 */}
           <div className="space-y-3 mb-4">
             {exercises.map((ex, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <input
-                  placeholder="운동명"
-                  value={ex.name}
-                  onChange={(e) => handleExerciseChange(i, 'name', e.target.value)}
-                  className="flex-1 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
-                />
-                <input
-                  placeholder="세트"
-                  value={ex.sets}
-                  onChange={(e) => handleExerciseChange(i, 'sets', e.target.value)}
-                  className="w-20 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
-                />
-                <input
-                  placeholder="횟수"
-                  value={ex.reps}
-                  onChange={(e) => handleExerciseChange(i, 'reps', e.target.value)}
-                  className="w-20 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
-                />
-                <input
-                  placeholder="중량"
-                  value={ex.weight}
-                  onChange={(e) => handleExerciseChange(i, 'weight', e.target.value)}
-                  className="w-24 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
-                />
+              <div key={i} className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-1">
+                  <input
+                    placeholder="운동명"
+                    value={ex.name}
+                    onChange={(e) => handleExerciseChange(i, 'name', e.target.value)}
+                    className="w-full sm:flex-1 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:w-auto">
+                    <input
+                      placeholder="세트"
+                      value={ex.sets}
+                      onChange={(e) => handleExerciseChange(i, 'sets', e.target.value)}
+                      className="w-full sm:w-20 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
+                    />
+                    <input
+                      placeholder="횟수"
+                      value={ex.reps}
+                      onChange={(e) => handleExerciseChange(i, 'reps', e.target.value)}
+                      className="w-full sm:w-20 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
+                    />
+                    <input
+                      placeholder="중량"
+                      value={ex.weight}
+                      onChange={(e) => handleExerciseChange(i, 'weight', e.target.value)}
+                      className="w-full sm:w-24 bg-[var(--card)] border border-[var(--border-color)] rounded-xl px-3 py-2"
+                    />
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => removeExercise(i)}
-                  className="text-sm px-2 py-2 rounded-lg border border-[var(--border-color)] hover:bg-[var(--card)]"
+                  className="w-full sm:w-auto text-sm px-2 py-2 rounded-lg border border-[var(--border-color)] hover:bg-[var(--card)]"
                   title="항목 제거"
                 >
                   삭제
