@@ -195,6 +195,7 @@ export default function TrainerLog() {
       const payload = {
         trainer_id: me.id,          // 트레이너 auth.users.id
         member_id: targetMemberId,  // 선택된 회원 PTLog id (members.id)
+        session_id: sessionId,      // 연결된 세션 (sessions.session_id)
         notes: note || null,
         exercises,                  // JSON으로 저장
         status: 'pending',
