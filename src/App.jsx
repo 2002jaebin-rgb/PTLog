@@ -14,6 +14,7 @@ import Settings from './pages/Settings'
 import TrainerReservation from './pages/TrainerReservation'
 import ClientReservation from './pages/ClientReservation'
 import TrainerSchedule from './pages/TrainerSchedule'
+import TrainerAddSession from './pages/TrainerAddSession'
 import TrainerLog from './pages/TrainerLog'
 import ClientHistory from './pages/ClientHistory'
 import ClientLog from './pages/ClientLog'
@@ -76,6 +77,7 @@ export default function App() {
               <Route path="/client-reservation" element={<ProtectedRoute user={user}><ClientReservation /></ProtectedRoute>} />
               <Route path="/client" element={<ProtectedRoute user={user}><ClientPage /></ProtectedRoute>} />
               <Route path="/trainer-schedule" element={<ProtectedRoute user={user}><TrainerSchedule /></ProtectedRoute>} />
+              <Route path="/trainer-schedule/add" element={<ProtectedRoute user={user}><TrainerAddSession /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute user={user}><Settings /></ProtectedRoute>} />
               <Route path="/trainer-log" element={<ProtectedRoute user={user}><TrainerLog /></ProtectedRoute>} />
               <Route path="/client-history" element={<ProtectedRoute user={user}><ClientHistory /></ProtectedRoute>} />

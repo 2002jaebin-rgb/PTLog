@@ -4,7 +4,7 @@ import ScheduleGrid from './ScheduleGrid'
 import Button from './ui/Button'
 import Card from './ui/Card'
 
-export default function AddSessionModal({ trainerId, monday, onClose, onSaved }) {
+export default function AddSessionModal({ trainerId, monday, onClose, onSaved, layout = 'modal' }) {
   const [sessionLength, setSessionLength] = useState(1) // 0.5, 1, 1.5, 2
   const [selectedSlots, setSelectedSlots] = useState({})
   const [loading, setLoading] = useState(false)
@@ -240,52 +240,65 @@ export default function AddSessionModal({ trainerId, monday, onClose, onSaved })
     }
   }
 
+  const cardClasses =
+    layout === 'page'
+      ? 'bg-[var(--bg-dark)] text-white w-full max-w-4xl mx-auto p-6'
+      : 'bg-[var(--bg-dark)] text-white w-[900px] max-w-[95%] max-h-[90vh] overflow-y-auto p-6 rounded-lg shadow-xl'
+
+  const content = (
+    <Card className={cardClasses}>
+      <h2 className="text-xl font-bold mb-4">수업 시간 추가</h2>
+
+      {/* 세션 길이 설정 */}
+      <div className="flex items-center gap-3 mb-4">
+        <label>세션 길이:</label>
+        <select
+          className="text-black rounded px-2 py-1"
+          value={sessionLength}
+          onChange={(e) => setSessionLength(Number(e.target.value))}
+        >
+          <option value={0.5}>30분</option>
+          <option value={1}>1시간</option>
+          <option value={1.5}>1시간 30분</option>
+          <option value={2}>2시간</option>
+        </select>
+      </div>
+
+      {/* 시간표: 기존/확정/대기 모두 표시, 기존 위도 선택 가능 */}
+      <div className="border border-gray-700 rounded-md overflow-hidden">
+        <ScheduleGrid
+          days={days}
+          sessions={existingSessions}         // 기존 + 확정 세션 표시
+          reservations={pendingReservations}  // pending도 노랑으로
+          selectedSlots={selectedSlots}       // 새 선택은 시안
+          selectable={true}
+          onToggleSlot={toggleSlot}
+          startHour={startHour}
+          endHour={endHour}
+          showStatusColors={{ available: true, pending: true, booked: true }}
+          allowSelectingExisting={true}       // ← 기존 위도 선택 허용 (겹침 감지용)
+        />
+      </div>
+
+      {/* 버튼 */}
+      <div className="flex justify-end gap-3 mt-6">
+        <Button onClick={onClose} className="bg-gray-500 hover:bg-gray-600">
+          취소
+        </Button>
+        <Button onClick={saveSessions} disabled={loading}>
+          {loading ? '저장 중...' : '등록하기'}
+        </Button>
+      </div>
+    </Card>
+  )
+
+  if (layout === 'page') {
+    return <div className="pb-10">{content}</div>
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-6 z-50">
-      <Card className="bg-[var(--bg-dark)] text-white w-[900px] max-w-[95%] max-h-[90vh] overflow-y-auto p-6 rounded-lg shadow-xl">
-        <h2 className="text-xl font-bold mb-4">수업 시간 추가</h2>
-
-        {/* 세션 길이 설정 */}
-        <div className="flex items-center gap-3 mb-4">
-          <label>세션 길이:</label>
-          <select
-            className="text-black rounded px-2 py-1"
-            value={sessionLength}
-            onChange={(e) => setSessionLength(Number(e.target.value))}
-          >
-            <option value={0.5}>30분</option>
-            <option value={1}>1시간</option>
-            <option value={1.5}>1시간 30분</option>
-            <option value={2}>2시간</option>
-          </select>
-        </div>
-
-        {/* 시간표: 기존/확정/대기 모두 표시, 기존 위도 선택 가능 */}
-        <div className="border border-gray-700 rounded-md overflow-hidden">
-          <ScheduleGrid
-            days={days}
-            sessions={existingSessions}         // 기존 + 확정 세션 표시
-            reservations={pendingReservations}  // pending도 노랑으로
-            selectedSlots={selectedSlots}       // 새 선택은 시안
-            selectable={true}
-            onToggleSlot={toggleSlot}
-            startHour={startHour}
-            endHour={endHour}
-            showStatusColors={{ available: true, pending: true, booked: true }}
-            allowSelectingExisting={true}       // ← 기존 위도 선택 허용 (겹침 감지용)
-          />
-        </div>
-
-        {/* 버튼 */}
-        <div className="flex justify-end gap-3 mt-6">
-          <Button onClick={onClose} className="bg-gray-500 hover:bg-gray-600">
-            취소
-          </Button>
-          <Button onClick={saveSessions} disabled={loading}>
-            {loading ? '저장 중...' : '등록하기'}
-          </Button>
-        </div>
-      </Card>
+      {content}
     </div>
   )
 }

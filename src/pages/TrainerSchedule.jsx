@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/supabaseClient'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -22,6 +23,7 @@ const ymdLocal = (d) => {
 }
 
 export default function TrainerSchedule() {
+  const navigate = useNavigate()
   const [trainerId, setTrainerId] = useState(null)
 
   const [existingSessions, setExistingSessions] = useState([])
@@ -32,6 +34,7 @@ export default function TrainerSchedule() {
   const [loading, setLoading] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   // 셀 클릭 → 세션 상세 모달
   const [inspectedSession, setInspectedSession] = useState(null)
@@ -64,6 +67,16 @@ export default function TrainerSchedule() {
 
   const startHour = 6
   const endHour = 23
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      if (typeof window === 'undefined') return
+      setIsMobile(window.innerWidth <= 768)
+    }
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [])
 
   useEffect(() => {
     const init = async () => {
@@ -225,7 +238,17 @@ export default function TrainerSchedule() {
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={() => setShowAddModal(true)}>+ 수업 시간 추가</Button>
+        <Button
+          onClick={() => {
+            if (isMobile) {
+              navigate('/trainer-schedule/add', { state: { monday: monday.toISOString() } })
+            } else {
+              setShowAddModal(true)
+            }
+          }}
+        >
+          + 수업 시간 추가
+        </Button>
         <Button onClick={() => setShowDeleteModal(true)} className="ml-2 bg-red-600 hover:bg-red-700">🗑 수업 시간 삭제</Button>
       </div>
 
