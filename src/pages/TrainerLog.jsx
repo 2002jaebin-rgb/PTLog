@@ -18,6 +18,12 @@ const toTodayString = () => {
 
 const formatTime = (timeStr) => (timeStr ? timeStr.slice(0, 5) : '')
 
+const coerceSessionId = (value) => {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isNaN(numeric) ? value : numeric
+}
+
 export default function TrainerLog() {
   const [me, setMe] = useState(null)                // 로그인한 트레이너 (auth user)
   const [sessionOptions, setSessionOptions] = useState([]) // 선택 가능한 완료 세션 목록
@@ -110,6 +116,8 @@ export default function TrainerLog() {
                 label,
                 startLabel,
                 endLabel,
+                start_time: session.start_time,
+                end_time: session.end_time,
                 memberName,
                 memberEmail,
                 date: session.date,
@@ -171,6 +179,8 @@ export default function TrainerLog() {
     setError('')
     setSaving(true)
     try {
+      const sessionIdValue = coerceSessionId(sessionId)
+
       // session_requests에 pending으로 기록
       const payload = {
         trainer_id: me.id,          // 트레이너 auth.users.id
@@ -178,6 +188,7 @@ export default function TrainerLog() {
         notes: note || null,
         exercises,                  // JSON으로 저장
         status: 'pending',
+        session_id: sessionIdValue,
       }
       const { error: insErr } = await supabase
         .from('session_requests')
