@@ -32,18 +32,71 @@ const normalizeSessionId = (value) => {
   return String(value)
 }
 
+const normalizeValue = (value) => {
+  if (value === null || value === undefined) return ''
+  return String(value).trim()
+}
+
 const coerceExercises = (rawExercises) => {
-  if (Array.isArray(rawExercises)) return rawExercises
-  if (typeof rawExercises === 'string') {
+  let list = []
+
+  if (Array.isArray(rawExercises)) {
+    list = rawExercises
+  } else if (typeof rawExercises === 'string') {
     try {
       const parsed = JSON.parse(rawExercises)
-      return Array.isArray(parsed) ? parsed : []
+      if (Array.isArray(parsed)) {
+        list = parsed
+      }
     } catch (e) {
       console.warn('[ClientPage] 운동 목록 파싱 실패:', e)
-      return []
     }
   }
-  return []
+
+  if (!Array.isArray(list)) return []
+
+  return list
+    .map((exercise) => {
+      if (!exercise || typeof exercise !== 'object') return null
+
+      const name = typeof exercise.name === 'string' ? exercise.name : ''
+      const rawSets = Array.isArray(exercise.sets) ? exercise.sets : []
+
+      const normalizedSets = rawSets
+        .map((set) => {
+          const weight = normalizeValue(set?.weight)
+          const reps = normalizeValue(set?.reps)
+          if (!weight && !reps) return null
+          return { weight, reps }
+        })
+        .filter(Boolean)
+
+      const legacySetCount = !Array.isArray(exercise.sets) ? normalizeValue(exercise.sets) : ''
+      const legacyWeight = !Array.isArray(exercise.sets) ? normalizeValue(exercise.weight) : ''
+      const legacyReps = !Array.isArray(exercise.sets) ? normalizeValue(exercise.reps) : ''
+
+      const fallbackSets = !normalizedSets.length && (legacyWeight || legacyReps)
+        ? [{ weight: legacyWeight, reps: legacyReps }]
+        : []
+
+      const sets = normalizedSets.length ? normalizedSets : fallbackSets
+      const hasLegacyInfo = Boolean(legacySetCount || legacyWeight || legacyReps)
+
+      if (!name && !sets.length && !hasLegacyInfo) return null
+
+      return {
+        name,
+        sets,
+        legacy: hasLegacyInfo
+          ? {
+              setCount: legacySetCount,
+              weight: legacyWeight,
+              reps: legacyReps,
+            }
+          : null,
+      }
+    })
+    .filter(Boolean)
 }
 
 export default function ClientPage() {
@@ -140,14 +193,51 @@ export default function ClientPage() {
           ) : (
             <p className="text-sm text-[var(--text-secondary)] mb-1">연결된 세션 시간 정보를 찾을 수 없습니다.</p>
           )}
-          <p className="font-semibold mb-2">{req.notes}</p>
-          <ul className="mb-2">
-            {req.exercises?.map((ex, i) => (
-              <li key={i}>
-                • {ex.name} {ex.sets}세트 × {ex.reps}회 ({ex.weight}kg)
-              </li>
-            ))}
-          </ul>
+          {req.notes && <p className="font-semibold mb-2">{req.notes}</p>}
+          {req.exercises?.length ? (
+            <div className="mb-3 space-y-2">
+              {req.exercises.map((ex, i) => (
+                <div key={i}>
+                  <p className="font-medium text-white">
+                    {ex.name || `운동 ${i + 1}`}
+                  </p>
+                  {ex.sets?.length ? (
+                    <ul className="ml-4 mt-1 space-y-1 text-sm text-[var(--text-secondary)]">
+                      {ex.sets.map((set, setIndex) => {
+                        const weightLabel = set.weight ? `${set.weight}kg` : ''
+                        const repsLabel = set.reps ? `${set.reps}회` : ''
+                        const detail = weightLabel && repsLabel
+                          ? `${weightLabel} · ${repsLabel}`
+                          : weightLabel || repsLabel || '기록 없음'
+                        return (
+                          <li key={setIndex}>
+                            세트 {setIndex + 1}: {detail}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ) : ex.legacy ? (
+                    <p className="ml-4 mt-1 text-sm text-[var(--text-secondary)]">
+                      {[
+                        ex.legacy.setCount ? `${ex.legacy.setCount}세트` : '',
+                        ex.legacy.weight && ex.legacy.reps
+                          ? `${ex.legacy.weight}kg × ${ex.legacy.reps}회`
+                          : ex.legacy.weight
+                            ? `${ex.legacy.weight}kg`
+                            : ex.legacy.reps
+                              ? `${ex.legacy.reps}회`
+                              : '',
+                      ].filter(Boolean).join(' · ') || '기록 없음'}
+                    </p>
+                  ) : (
+                    <p className="ml-4 mt-1 text-sm text-[var(--text-secondary)]">기록 없음</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mb-3 text-sm text-[var(--text-secondary)]">등록된 운동 기록이 없습니다.</p>
+          )}
           <button
             onClick={() => handleAccept(req.id)}
             className="bg-green-500 text-white px-4 py-2 rounded"
