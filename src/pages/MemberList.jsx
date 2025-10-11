@@ -5,6 +5,8 @@ import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
+const MIN_PASSWORD_LENGTH = 6
+
 const INITIAL_FORM = {
   name: '',
   email: '',
@@ -84,6 +86,11 @@ export default function MemberList() {
 
     if (!trimmedName || !trimmedEmail || !trimmedPassword) {
       alert('이름, 이메일, 비밀번호를 모두 입력해 주세요.')
+      return
+    }
+
+    if (trimmedPassword.length < MIN_PASSWORD_LENGTH) {
+      alert(`비밀번호를 ${MIN_PASSWORD_LENGTH}자 이상으로 입력해 주세요.`)
       return
     }
 
@@ -179,6 +186,7 @@ export default function MemberList() {
               value={form.name}
               onChange={handleFieldChange('name')}
               placeholder="회원 이름"
+              required
             />
             <Input
               type="email"
@@ -186,13 +194,16 @@ export default function MemberList() {
               value={form.email}
               onChange={handleFieldChange('email')}
               placeholder="member@email.com"
+              required
             />
             <Input
               type="password"
               label="비밀번호"
               value={form.password}
               onChange={handleFieldChange('password')}
-              placeholder="회원 로그인용 비밀번호"
+              placeholder="회원 로그인용 비밀번호 (최소 6자)"
+              minLength={MIN_PASSWORD_LENGTH}
+              required
             />
             <Input
               type="number"
@@ -201,6 +212,7 @@ export default function MemberList() {
               value={form.sessions_total}
               onChange={handleFieldChange('sessions_total')}
               placeholder="예: 10"
+              required
             />
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button type="submit" disabled={submitting} className="sm:w-32">

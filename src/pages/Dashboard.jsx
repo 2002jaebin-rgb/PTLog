@@ -5,6 +5,8 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 
+const MIN_PASSWORD_LENGTH = 6
+
 export default function Dashboard() {
   const [members, setMembers] = useState([])
   const [showForm, setShowForm] = useState(false)
@@ -35,6 +37,29 @@ export default function Dashboard() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
+    const trimmedName = newMember.name.trim()
+    const trimmedEmail = newMember.email.trim()
+    const trimmedPassword = newMember.password.trim()
+    const totalSessions = parseInt(newMember.sessions_total, 10)
+
+    if (!trimmedName || !trimmedEmail || !trimmedPassword) {
+      alert('이름, 이메일, 비밀번호를 모두 입력해 주세요.')
+      setLoading(false)
+      return
+    }
+
+    if (trimmedPassword.length < MIN_PASSWORD_LENGTH) {
+      alert(`비밀번호를 ${MIN_PASSWORD_LENGTH}자 이상으로 입력해 주세요.`)
+      setLoading(false)
+      return
+    }
+
+    if (!Number.isFinite(totalSessions) || totalSessions <= 0) {
+      alert('총 PT 회차를 1 이상으로 입력해 주세요.')
+      setLoading(false)
+      return
+    }
+
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-member`, {
         method: 'POST',
@@ -44,16 +69,16 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           trainer_id: user.id,
-          name: newMember.name,
-          email: newMember.email,
-          sessions_total: parseInt(newMember.sessions_total, 10),
-          password: newMember.password
+          name: trimmedName,
+          email: trimmedEmail,
+          sessions_total: totalSessions,
+          password: trimmedPassword
         })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '등록 실패')
 
-      alert(`회원 "${newMember.name}" 등록 완료!\n${newMember.email} / ${newMember.password}`)
+      alert(`회원 "${trimmedName}" 등록 완료!\n${trimmedEmail} / ${trimmedPassword}`)
       setShowForm(false)
       setNewMember({ name: '', email: '', sessions_total: 0, password: '' })
       fetchMembers()
@@ -80,6 +105,7 @@ export default function Dashboard() {
               value={newMember.name}
               onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
               placeholder="회원 이름"
+              required
             />
             <Input
               type="email"
@@ -87,13 +113,16 @@ export default function Dashboard() {
               value={newMember.email}
               onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
               placeholder="member@email.com"
+              required
             />
             <Input
               type="password"
               label="비밀번호"
               value={newMember.password}
               onChange={(e) => setNewMember({ ...newMember, password: e.target.value })}
-              placeholder="회원 로그인용 비밀번호"
+              placeholder="회원 로그인용 비밀번호 (최소 6자)"
+              minLength={MIN_PASSWORD_LENGTH}
+              required
             />
             <Input
               type="number"
@@ -101,6 +130,8 @@ export default function Dashboard() {
               value={newMember.sessions_total}
               onChange={(e) => setNewMember({ ...newMember, sessions_total: e.target.value })}
               placeholder="예: 10"
+              min={1}
+              required
             />
             <div className="flex gap-2 mt-4">
               <Button type="submit" disabled={loading}>
