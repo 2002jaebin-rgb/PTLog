@@ -87,7 +87,8 @@ export default function TrainerLog() {
           const now = new Date()
           normalizedSessions = (bookedSessions || [])
             .map((session) => {
-              const reservation = (approvedReservations || []).find((r) => r.session_id === session.session_id)
+              const sessionId = String(session.session_id)
+              const reservation = (approvedReservations || []).find((r) => String(r.session_id) === sessionId)
               if (!reservation) return null
 
               const referenceTime = toLocalDateTime(session.date, session.end_time || session.start_time)
@@ -102,7 +103,7 @@ export default function TrainerLog() {
               const label = `${session.date} ${startLabel}${endLabel ? ` ~ ${endLabel}` : ''} · ${memberName}`
 
               return {
-                session_id: session.session_id,
+                session_id: sessionId,
                 member_id: reservation.member_id,
                 label,
                 startLabel,
@@ -167,7 +168,13 @@ export default function TrainerLog() {
     setError('')
     setSaving(true)
     try {
-      let targetMemberId = memberId
+      const selected = sessionOptions.find((opt) => opt.session_id === sessionId) || null
+      if (!selected) {
+        setError('선택한 세션 정보를 찾을 수 없습니다.')
+        return
+      }
+
+      let targetMemberId = selected.member_id || memberId
 
       if (!targetMemberId) {
         const { data: fallbackReservations, error: fallbackErr } = await supabase
@@ -193,8 +200,9 @@ export default function TrainerLog() {
 
       // session_requests에 pending으로 기록
       const payload = {
-        trainer_id: me.id,          // 트레이너 auth.users.id
-        member_id: targetMemberId,  // 선택된 회원 PTLog id (members.id)
+        trainer_id: me.id,               // 트레이너 auth.users.id
+        member_id: targetMemberId,       // 선택된 회원 PTLog id (members.id)
+        session_id: selected.session_id, // 연결된 세션 (sessions.session_id)
         notes: note || null,
         exercises,                  // JSON으로 저장
         status: 'pending',
