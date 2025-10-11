@@ -15,8 +15,8 @@ export default function BottomNav({ role }) {
         ]
       : [
           { icon: '🏠', label: '홈', to: '/client' },
-          { icon: '📈', label: '운동 로그', to: '/client-history' },
-          { icon: '📝', label: '내 로그', to: '/client-log' },
+          { icon: '📈', label: 'PT로그', to: '/client-history' },
+          { icon: '📝', label: '운동기록', to: '/client-log' },
           { icon: '📅', label: '예약', to: '/client-reservation' },
           { icon: '⚙️', label: '설정', to: '/settings' }
         ]
