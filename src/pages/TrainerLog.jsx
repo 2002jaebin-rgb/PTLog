@@ -87,7 +87,8 @@ export default function TrainerLog() {
           const now = new Date()
           normalizedSessions = (bookedSessions || [])
             .map((session) => {
-              const reservation = (approvedReservations || []).find((r) => r.session_id === session.session_id)
+              const sessionId = String(session.session_id)
+              const reservation = (approvedReservations || []).find((r) => String(r.session_id) === sessionId)
               if (!reservation) return null
 
               const referenceTime = toLocalDateTime(session.date, session.end_time || session.start_time)
@@ -102,7 +103,7 @@ export default function TrainerLog() {
               const label = `${session.date} ${startLabel}${endLabel ? ` ~ ${endLabel}` : ''} · ${memberName}`
 
               return {
-                session_id: session.session_id,
+                session_id: sessionId,
                 member_id: reservation.member_id,
                 label,
                 startLabel,

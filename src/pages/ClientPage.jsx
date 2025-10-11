@@ -27,6 +27,25 @@ const buildSessionLabel = (session) => {
   return [dateLabel, timeLabel].filter(Boolean).join(' ')
 }
 
+const normalizeSessionId = (value) => {
+  if (value === null || value === undefined) return ''
+  return String(value)
+}
+
+const coerceExercises = (rawExercises) => {
+  if (Array.isArray(rawExercises)) return rawExercises
+  if (typeof rawExercises === 'string') {
+    try {
+      const parsed = JSON.parse(rawExercises)
+      return Array.isArray(parsed) ? parsed : []
+    } catch (e) {
+      console.warn('[ClientPage] 운동 목록 파싱 실패:', e)
+      return []
+    }
+  }
+  return []
+}
+
 export default function ClientPage() {
   const [requests, setRequests] = useState([])
 
@@ -61,7 +80,9 @@ export default function ClientPage() {
         return
       }
 
-      const sessionIds = [...new Set((reqs || []).map((req) => req.session_id).filter(Boolean))]
+      const sessionIds = [...new Set((reqs || [])
+        .map((req) => normalizeSessionId(req.session_id))
+        .filter(Boolean))]
       let sessionsMap = {}
 
       if (sessionIds.length) {
@@ -74,17 +95,21 @@ export default function ClientPage() {
           console.error(sessionsError)
         } else {
           sessionsMap = (sessions || []).reduce((acc, cur) => {
-            acc[cur.session_id] = cur
+            const sid = normalizeSessionId(cur.session_id)
+            if (sid) acc[sid] = cur
             return acc
           }, {})
         }
       }
 
       const enhancedRequests = (reqs || []).map((req) => {
-        const session = req.session_id ? sessionsMap[req.session_id] || null : null
+        const normalizedSessionId = normalizeSessionId(req.session_id)
+        const session = normalizedSessionId ? sessionsMap[normalizedSessionId] || null : null
         return {
           ...req,
           session,
+          session_id: normalizedSessionId,
+          exercises: coerceExercises(req.exercises),
           sessionLabel: buildSessionLabel(session),
         }
       })
@@ -100,7 +125,7 @@ export default function ClientPage() {
       .from('session_requests')
       .update({ status: 'accepted' })
       .eq('id', id)
-    setRequests(requests.filter((r) => r.id !== id))
+    setRequests((prev) => prev.filter((r) => r.id !== id))
   }
 
   if (!requests.length) return <p className="p-6">대기중인 요청이 없습니다.</p>
