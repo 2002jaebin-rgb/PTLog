@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/supabaseClient'
 import { useParams } from 'react-router-dom'
+import {
+  createEmptyExercise,
+  createEmptySet,
+  ensureExerciseHasAtLeastOneSet,
+  sanitizeExercisesForSubmit,
+} from '@/utils/exerciseForm'
 
 export default function MemberDetail() {
   const { id } = useParams()
   const [member, setMember] = useState(null)
-  const [exercises, setExercises] = useState([{ name: '', sets: '', reps: '', weight: '' }])
+  const [exercises, setExercises] = useState([createEmptyExercise()])
   const [note, setNote] = useState('')
   const [sent, setSent] = useState(false)
 
@@ -17,22 +23,78 @@ export default function MemberDetail() {
     fetchMember()
   }, [id])
 
-  const handleChange = (index, field, value) => {
-    const updated = [...exercises]
-    updated[index][field] = value
-    setExercises(updated)
+  const handleExerciseNameChange = (exerciseIndex, value) => {
+    setExercises((prev) => {
+      const next = [...prev]
+      const target = ensureExerciseHasAtLeastOneSet(next[exerciseIndex])
+      target.name = value
+      next[exerciseIndex] = target
+      return next
+    })
   }
 
-  const addExercise = () => setExercises([...exercises, { name: '', sets: '', reps: '', weight: '' }])
+  const handleSetChange = (exerciseIndex, setIndex, field, value) => {
+    setExercises((prev) => {
+      const next = [...prev]
+      const target = ensureExerciseHasAtLeastOneSet(next[exerciseIndex])
+      const sets = [...target.sets]
+      const currentSet = sets[setIndex] || createEmptySet()
+      sets[setIndex] = {
+        ...currentSet,
+        [field]: value,
+      }
+      target.sets = sets
+      next[exerciseIndex] = target
+      return next
+    })
+  }
+
+  const addExercise = () => {
+    setExercises((prev) => [...prev, createEmptyExercise()])
+  }
+
+  const removeExercise = (exerciseIndex) => {
+    setExercises((prev) => {
+      if (prev.length <= 1) {
+        return [createEmptyExercise()]
+      }
+      return prev.filter((_, idx) => idx !== exerciseIndex)
+    })
+  }
+
+  const addSetToExercise = (exerciseIndex) => {
+    setExercises((prev) => {
+      const next = [...prev]
+      const target = ensureExerciseHasAtLeastOneSet(next[exerciseIndex])
+      target.sets = [...target.sets, createEmptySet()]
+      next[exerciseIndex] = target
+      return next
+    })
+  }
+
+  const removeSetFromExercise = (exerciseIndex, setIndex) => {
+    setExercises((prev) => {
+      const next = [...prev]
+      const target = ensureExerciseHasAtLeastOneSet(next[exerciseIndex])
+      if (target.sets.length <= 1) {
+        target.sets = [createEmptySet()]
+      } else {
+        target.sets = target.sets.filter((_, idx) => idx !== setIndex)
+      }
+      next[exerciseIndex] = target
+      return next
+    })
+  }
 
   const handleSend = async () => {
+    const normalizedExercises = sanitizeExercisesForSubmit(exercises)
     const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase.from('session_requests').insert([
       {
         trainer_id: user.id,
         member_id: id,
         notes: note,
-        exercises,
+        exercises: normalizedExercises,
         status: 'pending',
       },
     ])
@@ -48,14 +110,64 @@ export default function MemberDetail() {
         <p className="text-green-600">회원에게 기록을 전송했습니다 ✅</p>
       ) : (
         <>
-          {exercises.map((ex, i) => (
-            <div key={i} className="flex gap-2 mb-2">
-              <input placeholder="운동명" value={ex.name} onChange={(e) => handleChange(i, 'name', e.target.value)} className="border p-1" />
-              <input placeholder="세트" value={ex.sets} onChange={(e) => handleChange(i, 'sets', e.target.value)} className="border p-1 w-16" />
-              <input placeholder="횟수" value={ex.reps} onChange={(e) => handleChange(i, 'reps', e.target.value)} className="border p-1 w-16" />
-              <input placeholder="중량" value={ex.weight} onChange={(e) => handleChange(i, 'weight', e.target.value)} className="border p-1 w-16" />
-            </div>
-          ))}
+          <div className="space-y-3 mb-4">
+            {exercises.map((ex, i) => (
+              <div key={i} className="border rounded-lg p-3 space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    placeholder="운동명"
+                    value={ex.name}
+                    onChange={(e) => handleExerciseNameChange(i, e.target.value)}
+                    className="flex-1 border rounded px-2 py-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeExercise(i)}
+                    className="border rounded px-2 py-1 text-sm"
+                  >
+                    삭제
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {ex.sets.map((set, setIndex) => (
+                    <div key={setIndex} className="grid grid-cols-1 gap-2 sm:grid-cols-[auto,1fr,1fr,auto] sm:items-center">
+                      <div className="text-sm text-gray-600 border rounded px-2 py-1">
+                        세트 {setIndex + 1}
+                      </div>
+                      <input
+                        placeholder="중량"
+                        value={set.weight}
+                        onChange={(e) => handleSetChange(i, setIndex, 'weight', e.target.value)}
+                        className="border rounded px-2 py-1"
+                      />
+                      <input
+                        placeholder="횟수"
+                        value={set.reps}
+                        onChange={(e) => handleSetChange(i, setIndex, 'reps', e.target.value)}
+                        className="border rounded px-2 py-1"
+                      />
+                      {ex.sets.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeSetFromExercise(i, setIndex)}
+                          className="border rounded px-2 py-1 text-sm"
+                        >
+                          세트 삭제
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => addSetToExercise(i)}
+                  className="border rounded px-2 py-1 text-sm"
+                >
+                  + 세트 추가
+                </button>
+              </div>
+            ))}
+          </div>
           <button onClick={addExercise} className="bg-gray-200 px-2 py-1 rounded mb-4">+ 운동 추가</button>
           <textarea
             placeholder="메모 (예: 오늘은 하체 집중)"
