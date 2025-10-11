@@ -3,6 +3,30 @@ import { supabase } from '@/supabaseClient'
 
 const formatTime = (timeStr) => (timeStr ? timeStr.slice(0, 5) : '')
 
+const formatDateWithWeekday = (dateStr) => {
+  if (!dateStr) return ''
+  const [year, month, day] = dateStr.split('-').map(Number)
+  if (!year || !month || !day) return dateStr
+  const date = new Date(year, month - 1, day)
+  const weekdays = ['일', '월', '화', '수', '목', '금', '토']
+  const weekday = weekdays[date.getDay()]
+  return `${month}월 ${day}일 (${weekday})`
+}
+
+const buildSessionLabel = (session) => {
+  if (!session) return ''
+  const dateLabel = formatDateWithWeekday(session.date)
+  const startLabel = formatTime(session.start_time)
+  const endLabel = formatTime(session.end_time)
+  const timeLabel = startLabel
+    ? endLabel
+      ? `${startLabel} ~ ${endLabel}`
+      : startLabel
+    : ''
+
+  return [dateLabel, timeLabel].filter(Boolean).join(' ')
+}
+
 export default function ClientPage() {
   const [requests, setRequests] = useState([])
 
@@ -56,10 +80,14 @@ export default function ClientPage() {
         }
       }
 
-      const enhancedRequests = (reqs || []).map((req) => ({
-        ...req,
-        session: req.session_id ? sessionsMap[req.session_id] || null : null,
-      }))
+      const enhancedRequests = (reqs || []).map((req) => {
+        const session = req.session_id ? sessionsMap[req.session_id] || null : null
+        return {
+          ...req,
+          session,
+          sessionLabel: buildSessionLabel(session),
+        }
+      })
 
       setRequests(enhancedRequests)
     }
@@ -82,12 +110,10 @@ export default function ClientPage() {
       <h1 className="text-xl font-bold mb-4">오늘 수업 확인</h1>
       {requests.map((req) => (
         <div key={req.id} className="border p-4 mb-4 rounded">
-          {req.session && (
-            <p className="text-sm text-gray-500 mb-1">
-              {req.session.date}{' '}
-              {formatTime(req.session.start_time)}
-              {req.session.end_time ? ` ~ ${formatTime(req.session.end_time)}` : ''}
-            </p>
+          {req.sessionLabel ? (
+            <p className="text-sm text-[var(--text-secondary)] mb-1">{req.sessionLabel}</p>
+          ) : (
+            <p className="text-sm text-[var(--text-secondary)] mb-1">연결된 세션 시간 정보를 찾을 수 없습니다.</p>
           )}
           <p className="font-semibold mb-2">{req.notes}</p>
           <ul className="mb-2">
