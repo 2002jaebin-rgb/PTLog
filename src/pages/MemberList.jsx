@@ -107,25 +107,18 @@ export default function MemberList() {
         throw authError || new Error('로그인 정보를 확인할 수 없습니다.')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-member`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('add-member', {
+        body: {
           trainer_id: auth.user.id,
           name: trimmedName,
           email: trimmedEmail,
           sessions_total: totalSessions,
           password: trimmedPassword
-        })
+        }
       })
 
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(payload.error || '회원 등록에 실패했습니다.')
-      }
+      if (error) throw new Error(error.message || '회원 등록에 실패했습니다.')
+      if (data?.error) throw new Error(data.error)
 
       alert(`회원 "${trimmedName}" 등록 완료!\n${trimmedEmail} / ${trimmedPassword}`)
       handleCloseForm()

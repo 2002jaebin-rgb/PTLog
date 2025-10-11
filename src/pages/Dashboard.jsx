@@ -61,22 +61,18 @@ export default function Dashboard() {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-member`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('add-member', {
+        body: {
           trainer_id: user.id,
           name: trimmedName,
           email: trimmedEmail,
           sessions_total: totalSessions,
           password: trimmedPassword
-        })
+        }
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '등록 실패')
+
+      if (error) throw new Error(error.message || '등록 실패')
+      if (data?.error) throw new Error(data.error)
 
       alert(`회원 "${trimmedName}" 등록 완료!\n${trimmedEmail} / ${trimmedPassword}`)
       setShowForm(false)
