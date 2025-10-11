@@ -5,6 +5,8 @@ import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 
+const MIN_PASSWORD_LENGTH = 6
+
 const INITIAL_FORM = {
   name: '',
   email: '',
@@ -87,6 +89,11 @@ export default function MemberList() {
       return
     }
 
+    if (trimmedPassword.length < MIN_PASSWORD_LENGTH) {
+      alert(`비밀번호를 ${MIN_PASSWORD_LENGTH}자 이상으로 입력해 주세요.`)
+      return
+    }
+
     if (!Number.isFinite(totalSessions) || totalSessions <= 0) {
       alert('총 PT 회차를 1 이상으로 입력해 주세요.')
       return
@@ -100,25 +107,18 @@ export default function MemberList() {
         throw authError || new Error('로그인 정보를 확인할 수 없습니다.')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-member`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('add-member', {
+        body: {
           trainer_id: auth.user.id,
           name: trimmedName,
           email: trimmedEmail,
           sessions_total: totalSessions,
           password: trimmedPassword
-        })
+        }
       })
 
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(payload.error || '회원 등록에 실패했습니다.')
-      }
+      if (error) throw new Error(error.message || '회원 등록에 실패했습니다.')
+      if (data?.error) throw new Error(data.error)
 
       alert(`회원 "${trimmedName}" 등록 완료!\n${trimmedEmail} / ${trimmedPassword}`)
       handleCloseForm()
@@ -179,6 +179,7 @@ export default function MemberList() {
               value={form.name}
               onChange={handleFieldChange('name')}
               placeholder="회원 이름"
+              required
             />
             <Input
               type="email"
@@ -186,13 +187,16 @@ export default function MemberList() {
               value={form.email}
               onChange={handleFieldChange('email')}
               placeholder="member@email.com"
+              required
             />
             <Input
               type="password"
               label="비밀번호"
               value={form.password}
               onChange={handleFieldChange('password')}
-              placeholder="회원 로그인용 비밀번호"
+              placeholder="회원 로그인용 비밀번호 (최소 6자)"
+              minLength={MIN_PASSWORD_LENGTH}
+              required
             />
             <Input
               type="number"
@@ -201,6 +205,7 @@ export default function MemberList() {
               value={form.sessions_total}
               onChange={handleFieldChange('sessions_total')}
               placeholder="예: 10"
+              required
             />
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button type="submit" disabled={submitting} className="sm:w-32">
