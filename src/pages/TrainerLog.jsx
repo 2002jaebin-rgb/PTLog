@@ -167,7 +167,13 @@ export default function TrainerLog() {
     setError('')
     setSaving(true)
     try {
-      let targetMemberId = memberId
+      const selected = sessionOptions.find((opt) => opt.session_id === sessionId) || null
+      if (!selected) {
+        setError('선택한 세션 정보를 찾을 수 없습니다.')
+        return
+      }
+
+      let targetMemberId = selected.member_id || memberId
 
       if (!targetMemberId) {
         const { data: fallbackReservations, error: fallbackErr } = await supabase
@@ -193,9 +199,9 @@ export default function TrainerLog() {
 
       // session_requests에 pending으로 기록
       const payload = {
-        trainer_id: me.id,          // 트레이너 auth.users.id
-        member_id: targetMemberId,  // 선택된 회원 PTLog id (members.id)
-        session_id: sessionId,      // 연결된 세션 (sessions.session_id)
+        trainer_id: me.id,               // 트레이너 auth.users.id
+        member_id: targetMemberId,       // 선택된 회원 PTLog id (members.id)
+        session_id: selected.session_id, // 연결된 세션 (sessions.session_id)
         notes: note || null,
         exercises,                  // JSON으로 저장
         status: 'pending',
